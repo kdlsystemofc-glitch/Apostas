@@ -1,0 +1,114 @@
+{
+  "name": "LeagueProfile",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "season": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "matches_sample": {
+      "type": "number"
+    },
+    "avg_goals": {
+      "type": "number"
+    },
+    "avg_goals_home": {
+      "type": "number"
+    },
+    "avg_goals_away": {
+      "type": "number"
+    },
+    "avg_corners": {
+      "type": "number"
+    },
+    "avg_corners_home": {
+      "type": "number"
+    },
+    "avg_corners_away": {
+      "type": "number"
+    },
+    "avg_cards": {
+      "type": "number"
+    },
+    "avg_cards_home": {
+      "type": "number"
+    },
+    "avg_cards_away": {
+      "type": "number"
+    },
+    "avg_xg": {
+      "type": "number"
+    },
+    "btts_pct": {
+      "type": "number"
+    },
+    "over_05_goals_pct": {
+      "type": "number"
+    },
+    "over_15_goals_pct": {
+      "type": "number"
+    },
+    "over_25_goals_pct": {
+      "type": "number"
+    },
+    "over_35_goals_pct": {
+      "type": "number"
+    },
+    "over_45_goals_pct": {
+      "type": "number"
+    },
+    "over_55_goals_pct": {
+      "type": "number"
+    },
+    "over_65_corners_pct": {
+      "type": "number"
+    },
+    "over_75_corners_pct": {
+      "type": "number"
+    },
+    "over_85_corners_pct": {
+      "type": "number"
+    },
+    "over_95_corners_pct": {
+      "type": "number"
+    },
+    "over_105_corners_pct": {
+      "type": "number"
+    },
+    "over_115_corners_pct": {
+      "type": "number"
+    },
+    "over_125_corners_pct": {
+      "type": "number"
+    },
+    "over_135_corners_pct": {
+      "type": "number"
+    },
+    "over_05_cards_pct": {
+      "type": "number"
+    },
+    "over_15_cards_pct": {
+      "type": "number"
+    },
+    "over_25_cards_pct": {
+      "type": "number"
+    },
+    "over_35_cards_pct": {
+      "type": "number"
+    },
+    "over_45_cards_pct": {
+      "type": "number"
+    },
+    "over_55_cards_pct": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "name": "Match",
+  "type": "object",
+  "properties": {
+    "home_team": {
+      "type": "string"
+    },
+    "away_team": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "league": {
+      "type": "string",
+      "description": "Nome do campeonato/liga (ex: Premier League, Brasileir\u00e3o S\u00e9rie A)"
+    },
+    "home_stats": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "away_stats": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "real_results": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed"
+      ],
+      "default": "pending"
+    },
+    "home_sofascore": {
+      "type": "number",
+      "description": "Nota SofaScore do time da casa (opcional)"
+    },
+    "away_sofascore": {
+      "type": "number",
+      "description": "Nota SofaScore do time de fora (opcional)"
+    },
+    "home_fifa": {
+      "type": "number",
+      "description": "Ranking FIFA do time da casa (apenas sele\u00e7\u00f5es, opcional)"
+    },
+    "away_fifa": {
+      "type": "number",
+      "description": "Ranking FIFA do time de fora (apenas sele\u00e7\u00f5es, opcional)"
+    },
+    "league_profile_id": {
+      "type": "string",
+      "description": "ID do LeagueProfile vinculado a este jogo (opcional)"
+    }
+  },
+  "required": [
+    "home_team",
+    "away_team",
+    "home_stats",
+    "away_stats",
+    "results"
+  ]
+}
