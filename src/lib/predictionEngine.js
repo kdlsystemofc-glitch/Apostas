@@ -237,7 +237,9 @@ function calcGols(atk, def_, isHome = false) {
   const id_ = pesosDinamicos(defensivos);
   const ic = 0.55 * io + 0.45 * id_;
   let xg = base * ic;
-  if (!isHome) {
+  if (isHome) {
+    xg *= 1.08;
+  } else {
     xg *= 0.92;
   }
 
@@ -277,8 +279,8 @@ function calcShotsOnTarget(atk, def_) {
 
 // ── Market 4: BTTS ──
 function calcBTTS(statsCasa, statsFora) {
-  const xgCasa = calcGols(statsCasa, statsFora).value;
-  const xgFora = calcGols(statsFora, statsCasa).value;
+  const xgCasa = calcGols(statsCasa, statsFora, true).value;
+  const xgFora = calcGols(statsFora, statsCasa, false).value;
 
   const pCasaMarca = 1 - Math.exp(-xgCasa);
   const pForaMarca = 1 - Math.exp(-xgFora);
@@ -456,7 +458,9 @@ export function analisarJogo(statsCasa, statsFora) {
 }
 
 export function sinalBTTS(p) {
-  if (p >= 0.72) return { label: "PROVÁVEL", color: "green" };
-  if (p >= 0.60) return { label: "POSSÍVEL", color: "yellow" };
-  return { label: "IMPROVÁVEL", color: "red" };
+  if (p >= 0.72) return { label: "SIM · FORTE", color: "green" };
+  if (p >= 0.60) return { label: "SIM · POSSÍVEL", color: "yellow" };
+  if (p <= 0.35) return { label: "NÃO · FORTE", color: "red" };
+  if (p <= 0.45) return { label: "NÃO · POSSÍVEL", color: "gray" };
+  return { label: "NEUTRO", color: "gray" };
 }

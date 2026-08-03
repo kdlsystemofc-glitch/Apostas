@@ -53,6 +53,9 @@ function buildRow(m) {
       : null,
     real_shots_home: num(rr.shots_home),
     real_shots_away: num(rr.shots_away),
+    real_shots_total: num(rr.shots_home) !== null && num(rr.shots_away) !== null
+      ? (num(rr.shots_home) || 0) + (num(rr.shots_away) || 0)
+      : null,
     real_cards_home: num(rr.cards_home),
     real_cards_away: num(rr.cards_away),
     real_cards_total: num(rr.cards_home) !== null && num(rr.cards_away) !== null

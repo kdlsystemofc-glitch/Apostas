@@ -63,8 +63,9 @@ export default function StatsInput({ onAnalysisComplete }) {
         status: "pending",
       });
 
+      const selectedProfile = leagueProfiles.find(lp => lp.id === leagueProfileId) || null;
       toast({ title: "Análise concluída!", description: `${homeTeam} vs ${awayTeam}` });
-      onAnalysisComplete?.(match);
+      onAnalysisComplete?.(match, selectedProfile);
 
       setHomeTeam("");
       setAwayTeam("");

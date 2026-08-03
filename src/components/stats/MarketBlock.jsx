@@ -1,8 +1,10 @@
 import React from "react";
-import { poissonOver, sinalPoisson } from "@/lib/predictionEngine";
+import { poissonOver, sinalPoisson, sinalPoissonGols } from "@/lib/predictionEngine";
 import SignalBadge from "./SignalBadge";
 
-export default function MarketBlock({ icon, title, homeName, awayName, xHome, xAway, xTotal, lines }) {
+export default function MarketBlock({ icon, title, homeName, awayName, xHome, xAway, xTotal, lines, sinalFn, warning }) {
+  const useSinal = sinalFn || sinalPoisson;
+
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
       <div className="px-5 py-3 bg-slate-900 text-white flex items-center gap-2">
@@ -31,7 +33,7 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
           <div className="space-y-1.5">
             {lines.map(line => {
               const prob = poissonOver(xTotal, line);
-              const sinal = sinalPoisson(prob);
+              const sinal = useSinal(prob);
               return (
                 <div key={line} className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
                   <span className="text-sm font-medium text-slate-700">Over {line}</span>
@@ -45,6 +47,12 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
           </div>
         </div>
       </div>
+
+      {warning && (
+        <div className="px-4 py-2 bg-amber-50 border-t border-amber-100">
+          <p className="text-xs text-amber-700">{warning}</p>
+        </div>
+      )}
     </div>
   );
 }

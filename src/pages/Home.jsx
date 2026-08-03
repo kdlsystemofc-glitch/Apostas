@@ -11,11 +11,13 @@ import CalibrationView from "@/components/stats/CalibrationView";
 
 export default function Home() {
   const [lastMatch, setLastMatch] = useState(null);
+  const [lastLeagueProfile, setLastLeagueProfile] = useState(null);
   const [tab, setTab] = useState("new");
   const navigate = useNavigate();
 
-  const handleAnalysisComplete = (match) => {
+  const handleAnalysisComplete = (match, leagueProfile) => {
     setLastMatch(match);
+    setLastLeagueProfile(leagueProfile);
     setTab("results");
   };
 
@@ -78,7 +80,7 @@ export default function Home() {
           </TabsContent>
 
           <TabsContent value="results">
-            {lastMatch && <MatchResults match={lastMatch} />}
+            {lastMatch && <MatchResults match={lastMatch} leagueProfile={lastLeagueProfile} />}
           </TabsContent>
 
           <TabsContent value="calibration">

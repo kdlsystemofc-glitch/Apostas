@@ -19,6 +19,11 @@ function calcBloco(matches) {
     { key: "faltas",     prev: m => m.results?.xfouls_total,      real: buildRealSum("fouls_home", "fouls_away") },
     { key: "saves",      prev: m => m.results?.xsaves_total,      real: buildRealSum("saves_home", "saves_away") },
     { key: "totalshots", prev: m => m.results?.xtotalshots_total, real: buildRealSum("totalshots_home", "totalshots_away") },
+    { key: "btts", prev: m => m.results?.p_btts, real: m => {
+      const rr = m.real_results;
+      if (rr?.btts === undefined) return null;
+      return Number(rr.btts);
+    }},
   ];
 
   return mercados.map(({ key, prev, real }) => {
@@ -54,6 +59,7 @@ const LABELS = {
   faltas: "Faltas",
   saves: "Defesas Goleiro",
   totalshots: "Chutes Totais",
+  btts: "BTTS",
 };
 
 export default function CalibrationView() {
