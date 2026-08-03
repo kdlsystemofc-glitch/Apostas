@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import MatchResults from "@/components/stats/MatchResults";
+import MatchResultBlock from "@/components/stats/MatchResultBlock";
 import CornerDetails from "@/components/stats/CornerDetails";
 import BestBetsByMarket from "@/components/stats/BestBetsByMarket";
 
@@ -100,6 +101,7 @@ export default function MatchDetail() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
+        <MatchResultBlock match={match} />
         <MatchResults match={match} leagueProfile={leagueProfile} />
 
         <BestBetsByMarket match={match} leagueProfile={leagueProfile} />

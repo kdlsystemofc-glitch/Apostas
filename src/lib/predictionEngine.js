@@ -398,12 +398,48 @@ function calcTotalShots(atk, def_) {
   };
 }
 
+function calcResultado(xgCasa, xgFora) {
+  const maxGols = 8;
+  let pCasa = 0, pEmpate = 0, pFora = 0;
+  const placares = [];
+
+  function poissonPMF(k, lambda) {
+    let r = 1;
+    for (let i = 1; i <= k; i++) r *= i;
+    return Math.exp(-lambda) * Math.pow(lambda, k) / r;
+  }
+
+  for (let i = 0; i <= maxGols; i++) {
+    for (let j = 0; j <= maxGols; j++) {
+      const p = poissonPMF(i, xgCasa) * poissonPMF(j, xgFora);
+      placares.push({ home: i, away: j, prob: p });
+      if (i > j) pCasa += p;
+      else if (i === j) pEmpate += p;
+      else pFora += p;
+    }
+  }
+
+  placares.sort((a, b) => b.prob - a.prob);
+
+  return {
+    p_casa_vence: Math.round(pCasa * 10000) / 10000,
+    p_empate:     Math.round(pEmpate * 10000) / 10000,
+    p_fora_vence: Math.round(pFora * 10000) / 10000,
+    placares_top5: placares.slice(0, 5).map(p => ({
+      placar: `${p.home}×${p.away}`,
+      prob: Math.round(p.prob * 10000) / 10000,
+    })),
+  };
+}
+
 // ── Full match analysis ──
 export function analisarJogo(statsCasa, statsFora) {
   const corners_casa = calcCorners(statsCasa, statsFora, true);
   const corners_fora = calcCorners(statsFora, statsCasa, false);
   const gols_casa = calcGols(statsCasa, statsFora, true);
   const gols_fora = calcGols(statsFora, statsCasa, false);
+
+  const resultado = calcResultado(gols_casa.value, gols_fora.value);
 
   const shots_casa = calcShotsOnTarget(statsCasa, statsFora);
   const shots_fora = calcShotsOnTarget(statsFora, statsCasa);
@@ -421,6 +457,11 @@ export function analisarJogo(statsCasa, statsFora) {
   const totalshots_fora = calcTotalShots(statsFora, statsCasa);
 
   return {
+    p_casa_vence: resultado.p_casa_vence,
+    p_empate: resultado.p_empate,
+    p_fora_vence: resultado.p_fora_vence,
+    placares_top5: resultado.placares_top5,
+
     xc_casa: corners_casa.value,
     xc_fora: corners_fora.value,
     xc_total: Math.round((corners_casa.value + corners_fora.value) * 100) / 100,

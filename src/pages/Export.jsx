@@ -28,6 +28,9 @@ function buildRow(m) {
     xcard_fora: r.xcard_fora,
     xcard_total: r.xcard_total,
     p_btts: r.p_btts,
+    p_casa_vence: r.p_casa_vence,
+    p_empate: r.p_empate,
+    p_fora_vence: r.p_fora_vence,
 
     xfouls_casa: r.xfouls_casa,
     xfouls_fora: r.xfouls_fora,
