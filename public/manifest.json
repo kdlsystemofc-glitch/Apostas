@@ -1,0 +1,8 @@
+{
+  "short_name": "SportsPredictor",
+  "name": "Sports Predictor",
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone"
+}
