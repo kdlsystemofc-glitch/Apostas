@@ -1,39 +1,21 @@
-**Welcome to your Base44 project** 
+# Sports Predictor
+Sistema de previsão de apostas esportivas baseado em análise estatística de dados do StatsHub.
 
-**About**
+## Stack
+- React + Vite
+- TailwindCSS + shadcn/ui
+- Supabase (banco de dados)
 
-View and Edit  your app on [Base44.com](http://Base44.com) 
+## Funcionalidades
+- 9 mercados de aposta (corners, gols, chutes, cartões, etc.)
+- Probabilidade de vitória 1X2 com placar mais provável
+- BTTS (Ambas Marcam) com sinal SIM/NÃO
+- Calibração automática por blocos de 10 jogos
+- Importação de perfis de liga (FootyStats CSV)
+- Exportação de dados para análise externa
 
-This project contains everything you need to run your app locally.
-
-**Edit the code in your local development environment**
-
-Any change pushed to the repo will also be reflected in the Base44 Builder.
-
-**Prerequisites:** 
-
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
-
-```
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
-```
-
-Run the app: `npm run dev`
-
-**Publish your changes**
-
-Open [Base44.com](http://Base44.com) and click on Publish.
-
-**Docs & Support**
-
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
-
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+## Como usar
+1. Copie as estatísticas do StatsHub (tabela completa)
+2. Cole no campo do time da casa e do time de fora
+3. Clique em "Analisar"
+4. Veja as previsões e dicas de aposta

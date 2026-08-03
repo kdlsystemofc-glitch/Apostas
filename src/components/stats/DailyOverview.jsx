@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { Loader2, ChevronRight, Calendar } from "lucide-react";
+import { ChevronRight, Calendar } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { poissonOver, sinalPoisson, sinalPoissonGols, sinalBTTS } from "@/lib/predictionEngine";
 
 function linhasDinamicas(x, nLados = 3) {
-  // Linhas de aposta REAIS: sempre X.5, espaçamento de 1 em 1.
-  // Casas de aposta só usam Over 0.5, 1.5, 2.5, 3.5, 4.5, ...
-  // Nunca Over 3.0, Over 10.0, Over 28.0 — esses não existem.
   if (!x || x <= 0) return [];
-  // Centro = X.5 mais próximo do xValor
   const centro = Math.floor(x) + 0.5;
   const linhas = [];
   for (let i = -nLados; i <= nLados; i++) {
@@ -50,6 +47,21 @@ function getMatchSignals(match) {
 
   const signals = [];
 
+  // 1X2 Result
+  if (r.p_casa_vence) {
+    const maior = Math.max(r.p_casa_vence, r.p_empate, r.p_fora_vence);
+    const label = maior === r.p_casa_vence ? `${match.home_team} vence`
+                : maior === r.p_fora_vence ? `${match.away_team} vence`
+                : "Empate";
+    signals.push({
+      market: "Resultado",
+      prob: maior,
+      sinal: { label: label, color: maior >= 0.45 ? "green" : "gray" },
+      strength: maior - 0.33,
+      isResult: true,
+    });
+  }
+
   // Corners
   const corners = bestSignal("Escanteios", r.xc_total);
   if (corners && corners.sinal.label !== "NEUTRO") signals.push(corners);
@@ -65,6 +77,14 @@ function getMatchSignals(match) {
   // Cards
   const cards = bestSignal("Cartões", r.xcard_total);
   if (cards && cards.sinal.label !== "NEUTRO") signals.push(cards);
+
+  // Saves
+  const saves = bestSignal("Defesas Goleiro", r.xsaves_total);
+  if (saves && saves.sinal.label !== "NEUTRO") signals.push(saves);
+
+  // Total Shots
+  const totalshots = bestSignal("Chutes Totais", r.xtotalshots_total);
+  if (totalshots && totalshots.sinal.label !== "NEUTRO") signals.push(totalshots);
 
   // BTTS
   const bttsSinal = sinalBTTS(r.p_btts);
@@ -98,8 +118,10 @@ export default function DailyOverview() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      <div className="space-y-3 p-6">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
       </div>
     );
   }
@@ -158,25 +180,35 @@ export default function DailyOverview() {
                 >
                   {/* Header */}
                   <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between">
-                    <div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        match.status === "completed" ? "bg-emerald-500" : "bg-amber-400"
+                      }`} />
                       <p className="font-semibold text-sm">
                         {match.home_team} <span className="text-muted-foreground font-normal mx-0.5">vs</span> {match.away_team}
                       </p>
                       {match.real_results && Object.keys(match.real_results).length > 0 && (
-                        <p className="text-xs text-emerald-600 font-medium mt-0.5">✓ Resultado registrado</p>
+                        <p className="text-xs text-emerald-600 font-medium ml-2">✓ Resultado registrado</p>
                       )}
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </div>
 
                   {/* Signals */}
-                  <div className="p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                  <div className="p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                     {signals.map((sig, i) => (
-                      <div key={i} className="rounded-lg bg-slate-50 p-2.5 text-center">
+                      <div key={i} className="rounded-lg bg-slate-50 p-3 text-center">
                         <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide truncate">{sig.market}</p>
-                        {sig.isBTTS ? (
+                        {sig.isResult ? (
                           <>
-                            <p className="text-base font-bold mt-0.5">{(sig.prob * 100).toFixed(0)}%</p>
+                            <p className="text-lg font-bold mt-0.5">{(sig.prob * 100).toFixed(0)}%</p>
+                            <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClasses[sig.sinal.color]}`}>
+                              {sig.sinal.label}
+                            </span>
+                          </>
+                        ) : sig.isBTTS ? (
+                          <>
+                            <p className="text-lg font-bold mt-0.5">{(sig.prob * 100).toFixed(0)}%</p>
                             <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClasses[sig.sinal.color]}`}>
                               {sig.sinal.label}
                             </span>
@@ -184,7 +216,7 @@ export default function DailyOverview() {
                         ) : (
                           <>
                             <p className="text-[11px] text-muted-foreground mt-0.5">Over {sig.line}</p>
-                            <p className="text-base font-bold">{(sig.prob * 100).toFixed(0)}%</p>
+                            <p className="text-lg font-bold">{(sig.prob * 100).toFixed(0)}%</p>
                             <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClasses[sig.sinal.color]}`}>
                               {sig.sinal.label}
                             </span>
@@ -199,8 +231,10 @@ export default function DailyOverview() {
                     <div className="px-4 py-2 bg-slate-900 text-white flex items-center justify-between text-xs">
                       <span className="text-slate-300">🔥 Melhor aposta:</span>
                       <span className="font-semibold">
-                        {topSignal.isBTTS
-                          ? `Ambas Marcam — ${(topSignal.prob * 100).toFixed(0)}%`
+                        {topSignal.isResult
+                          ? `${topSignal.sinal.label} — ${(topSignal.prob * 100).toFixed(0)}%`
+                          : topSignal.isBTTS
+                          ? `Ambas Marcam (${topSignal.sinal.label}) — ${(topSignal.prob * 100).toFixed(0)}%`
                           : `${topSignal.market} Over ${topSignal.line} — ${(topSignal.prob * 100).toFixed(0)}%`}
                       </span>
                     </div>

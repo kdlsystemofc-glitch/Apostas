@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function calcBloco(matches) {
   function buildRealSum(homeKey, awayKey) {
@@ -70,7 +70,15 @@ export default function CalibrationView() {
     base44.entities.Match.list("-date", 200).then(setMatches).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+  if (loading) {
+    return (
+      <div className="space-y-3 p-6">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
 
   const completed = matches.filter(m => m.status === "completed");
   if (completed.length === 0) {

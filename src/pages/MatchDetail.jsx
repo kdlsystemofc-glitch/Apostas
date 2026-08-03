@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { Loader2, ArrowLeft, Edit3, Save } from "lucide-react";
+import { ArrowLeft, Edit3, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import MatchResults from "@/components/stats/MatchResults";
 import MatchResultBlock from "@/components/stats/MatchResultBlock";
@@ -41,6 +42,25 @@ export default function MatchDetail() {
       if (gh !== "" && gh !== undefined && ga !== "" && ga !== undefined) {
         updated.btts = (Number(gh) > 0 && Number(ga) > 0) ? 1 : 0;
       }
+
+      // Calcula totais automaticamente
+      const pairs = [
+        ["corners_home", "corners_away"],
+        ["goals_home", "goals_away"],
+        ["shots_home", "shots_away"],
+        ["cards_home", "cards_away"],
+        ["fouls_home", "fouls_away"],
+        ["saves_home", "saves_away"],
+        ["totalshots_home", "totalshots_away"],
+      ];
+      for (const [h, a] of pairs) {
+        if (updated[h] !== "" && updated[h] !== undefined &&
+            updated[a] !== "" && updated[a] !== undefined) {
+          const total_key = h.replace("_home", "_total");
+          updated[total_key] = Number(updated[h]) + Number(updated[a]);
+        }
+      }
+
       setRealResults(updated);
 
       const hasAnyData = Object.values(updated).some(v => v !== "" && v !== undefined && v !== null);
@@ -58,8 +78,10 @@ export default function MatchDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin" />
+      <div className="max-w-6xl mx-auto space-y-3 p-6">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
       </div>
     );
   }

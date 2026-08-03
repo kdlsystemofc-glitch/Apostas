@@ -96,7 +96,7 @@ export default function MatchResults({ match, leagueProfile }) {
           xAway={r.xfouls_fora}
           xTotal={r.xfouls_total}
           lines={linhasDinamicas(r.xfouls_total)}
-          warning="⚠ Mercado com alta variância"
+          warning="⚠ Mercado com alta variância — sinais removidos das recomendações automáticas"
         />
         <MarketBlock
           icon="🧤"

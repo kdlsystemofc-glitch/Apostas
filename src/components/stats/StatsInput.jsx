@@ -79,6 +79,9 @@ export default function StatsInput({ onAnalysisComplete }) {
     }
   };
 
+  const placeholderTextCasa = "Cole aqui as estatísticas do time da casa.\n\nFormatos aceitos:\n• Direto do StatsHub: copie a tabela inteira do site\n• Via Excel: copie do Excel após colar do StatsHub\n\nEstatísticas necessárias: Goals, Corners, Cards, Shots On Target, Total Shots, Fouls, etc.";
+  const placeholderTextFora = "Cole aqui as estatísticas do time de fora.\n\nFormatos aceitos:\n• Direto do StatsHub: copie a tabela inteira do site\n• Via Excel: copie do Excel após colar do StatsHub\n\nEstatísticas necessárias: Goals, Corners, Cards, Shots On Target, Total Shots, Fouls, etc.";
+
   return (
     <div className="space-y-6">
       <div>
@@ -101,11 +104,11 @@ export default function StatsInput({ onAnalysisComplete }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Time da Casa</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">🏠 Time da Casa (mandante)</Label>
           <Input value={homeTeam} onChange={e => setHomeTeam(e.target.value)} placeholder="Ex: Argentina" className="mt-1.5" />
         </div>
         <div>
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Time de Fora</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">✈️ Time de Fora (visitante)</Label>
           <Input value={awayTeam} onChange={e => setAwayTeam(e.target.value)} placeholder="Ex: Austria" className="mt-1.5" />
         </div>
         <div>
@@ -123,14 +126,17 @@ export default function StatsInput({ onAnalysisComplete }) {
           <Textarea
             value={homeText}
             onChange={e => setHomeText(e.target.value)}
-            placeholder="Cole aqui as estatísticas do time da casa. Aceita dois formatos: • Direto do StatsHub: copie a tabela inteira do site • Via Excel: copie do Excel após importar do StatsHub"
+            placeholder={placeholderTextCasa}
             className="mt-1.5 h-48 font-mono text-xs"
           />
-          {homeText && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {Object.keys(parseStatsHubText(homeText)).length} estatísticas detectadas
-            </p>
-          )}
+          <div className={`mt-1.5 text-xs font-medium ${
+            homeStatsCount >= 10 ? "text-emerald-600" :
+            homeStatsCount >= 5 ? "text-amber-600" : "text-red-500"
+          }`}>
+            {homeText.length > 5 ? `${homeStatsCount} estatísticas detectadas` : ""}
+            {homeStatsCount >= 10 && " ✓"}
+            {homeStatsCount > 0 && homeStatsCount < 5 && " — formato não reconhecido"}
+          </div>
         </div>
         <div>
           <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -140,27 +146,32 @@ export default function StatsInput({ onAnalysisComplete }) {
           <Textarea
             value={awayText}
             onChange={e => setAwayText(e.target.value)}
-            placeholder="Cole aqui as estatísticas do time de fora. Aceita dois formatos: • Direto do StatsHub: copie a tabela inteira do site • Via Excel: copie do Excel após importar do StatsHub"
+            placeholder={placeholderTextFora}
             className="mt-1.5 h-48 font-mono text-xs"
           />
-          {awayText && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {Object.keys(parseStatsHubText(awayText)).length} estatísticas detectadas
-            </p>
-          )}
+          <div className={`mt-1.5 text-xs font-medium ${
+            awayStatsCount >= 10 ? "text-emerald-600" :
+            awayStatsCount >= 5 ? "text-amber-600" : "text-red-500"
+          }`}>
+            {awayText.length > 5 ? `${awayStatsCount} estatísticas detectadas` : ""}
+            {awayStatsCount >= 10 && " ✓"}
+            {awayStatsCount > 0 && awayStatsCount < 5 && " — formato não reconhecido"}
+          </div>
         </div>
       </div>
 
       {statsInsuficientes && (homeText.length > 10 || awayText.length > 10) && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700">
-          <strong>⚠ Formato não reconhecido.</strong> O app aceita dois formatos:
-          <br/>• <strong>StatsHub direto:</strong> copie a tabela direto do site statshub.com
-          <br/>• <strong>Via Excel:</strong> cole no Excel primeiro, depois copie do Excel
-          <br/>Stats detectados: {homeStatsCount} (casa) / {awayStatsCount} (fora) — mínimo: 5 cada
+        <div className="rounded-lg bg-red-50 border border-red-200 p-3">
+          <p className="text-xs text-red-700 font-medium">
+            ⚠ Formato não reconhecido — {homeStatsCount} stats (casa) / {awayStatsCount} stats (fora)
+          </p>
+          <p className="text-xs text-red-600 mt-1">
+            Dica: copie a tabela inteira do StatsHub (todas as linhas de Goals até Yellow Cards)
+          </p>
         </div>
       )}
 
-      <Button onClick={handleAnalyze} disabled={statsInsuficientes || loading} className="w-full h-12 text-base font-semibold">
+      <Button onClick={handleAnalyze} disabled={statsInsuficientes || loading || !homeTeam.trim() || !awayTeam.trim()} className="w-full h-12 text-base font-semibold">
         {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Zap className="w-5 h-5 mr-2" />}
         {loading ? "Analisando..." : "Analisar Jogo"}
       </Button>

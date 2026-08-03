@@ -193,7 +193,7 @@ function calcCorners(atk, def_, isHome = false) {
   const ic = 0.60 * io + 0.40 * id_;
   let xc = base * ic;
   if (isHome) {
-    xc *= 1.15;
+    xc *= 1.18;
   }
 
   return {
@@ -250,7 +250,7 @@ function calcGols(atk, def_, isHome = false) {
 }
 
 // ── Market 3: Shots on Target ──
-function calcShotsOnTarget(atk, def_) {
+function calcShotsOnTarget(atk, def_, isHome = false) {
   const base = ancora(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c"));
 
   const ofensivos = {
@@ -316,7 +316,7 @@ function calcBTTS(statsCasa, statsFora) {
 function calcCartoes(atk, def_, isHome = false) {
   const baseMedia = ancora(g(atk, "cards"), g(def_, "cards", "c"));
   const baseMax = Math.max(g(atk, "cards"), g(def_, "cards", "c"));
-  const base = baseMedia * 0.85 + baseMax * 0.15;
+  const base = baseMedia * 0.90 + baseMax * 0.10;
 
   const fatores = {
     fouls:           [0.25, indice(g(atk, "fouls"),           g(def_, "fouls",           "c"))],
@@ -381,7 +381,7 @@ function calcSaves(atk, def_) {
 }
 
 // ── Market 9: Chutes Totais ──
-function calcTotalShots(atk, def_) {
+function calcTotalShots(atk, def_, isHome = false) {
   const base = ancora(g(atk, "total_shots"), g(def_, "total_shots", "c"));
   const fatores = {
     shots_in_box:       [0.26, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],

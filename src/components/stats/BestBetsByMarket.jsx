@@ -91,6 +91,10 @@ export default function BestBetsByMarket({ match, leagueProfile }) {
     { icon: "🟨", label: "Cartões Total",
       x: r.xcard_total * fCards, dynamicLines: true,
       overMap: overMaps.cards },
+    { icon: "🟨", label: `Cartões ${match.home_team}`, x: r.xcard_casa * fCards, dynamicLines: true },
+    { icon: "🟨", label: `Cartões ${match.away_team}`, x: r.xcard_fora * fCards, dynamicLines: true },
+    { icon: "🎯", label: `Chutes Gol ${match.home_team}`, x: r.xs_casa, dynamicLines: true },
+    { icon: "🎯", label: `Chutes Gol ${match.away_team}`, x: r.xs_fora, dynamicLines: true },
     { icon: "🤜", label: "Faltas",               x: r.xfouls_total,      dynamicLines: true, hidden: true },
     { icon: "🧤", label: "Defesas Goleiro Total", x: r.xsaves_total,      dynamicLines: true },
     { icon: "🧤", label: `Defesas Goleiro ${match.home_team}`, x: r.xsaves_casa, dynamicLines: true },
@@ -107,6 +111,7 @@ export default function BestBetsByMarket({ match, leagueProfile }) {
     });
 
   const sorted = [...rows].sort((a, b) => b.best.strength - a.best.strength);
+  const allNeutral = sorted.length > 0 && sorted.every(m => m.best.sinal.label === "NEUTRO");
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
@@ -179,15 +184,26 @@ export default function BestBetsByMarket({ match, leagueProfile }) {
         </div>
       </div>
 
-      {sorted[0]?.best.sinal.label !== "NEUTRO" && (
-        <div className="px-5 py-3 bg-emerald-50 border-t border-emerald-100 flex items-center justify-between">
-          <span className="text-xs font-medium text-emerald-700">
-            🏆 Sinal mais forte:
-          </span>
-          <span className="text-sm font-bold text-emerald-800">
-            {sorted[0].label} · Over {sorted[0].best.linha} · {(sorted[0].best.prob * 100).toFixed(1)}%
-          </span>
+      {allNeutral ? (
+        <div className="px-5 py-4 text-center bg-slate-50 border-t">
+          <p className="text-sm text-muted-foreground font-medium">
+            Sem sinais fortes para este jogo
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Todos os mercados estão na zona neutra (40-60%). Considere não apostar neste jogo.
+          </p>
         </div>
+      ) : (
+        sorted[0]?.best.sinal.label !== "NEUTRO" && (
+          <div className="px-5 py-3 bg-emerald-50 border-t border-emerald-100 flex items-center justify-between">
+            <span className="text-xs font-medium text-emerald-700">
+              🏆 Sinal mais forte:
+            </span>
+            <span className="text-sm font-bold text-emerald-800">
+              {sorted[0].label} · Over {sorted[0].best.linha} · {(sorted[0].best.prob * 100).toFixed(1)}%
+            </span>
+          </div>
+        )
       )}
     </div>
   );
