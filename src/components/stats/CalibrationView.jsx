@@ -33,11 +33,24 @@ function calcBloco(matches) {
     
     if (dados.length < 3) return { key, status: "insuficiente", n: dados.length };
     
-    const mediaPrev = dados.reduce((s, d) => s + d.p, 0) / dados.length;
-    const mediaReal = dados.reduce((s, d) => s + d.r, 0) / dados.length;
-    const vies = mediaPrev - mediaReal;
-    const mae = dados.reduce((s, d) => s + Math.abs(d.p - d.r), 0) / dados.length;
-    
+    // Sucesso dos sinais (se real acertou a linha principal prevista)
+    let acertos = 0;
+    let avaliados = 0;
+    for (const d of dados) {
+      if (key === "btts") {
+        const predBTTS = d.p >= 0.5 ? 1 : 0;
+        if (predBTTS === d.r) acertos++;
+        avaliados++;
+      } else {
+        const linhaPrincipal = Math.floor(d.p) + 0.5;
+        const acertoOver = d.r > linhaPrincipal;
+        const previsaoOver = d.p >= linhaPrincipal;
+        if (previsaoOver === acertoOver) acertos++;
+        avaliados++;
+      }
+    }
+    const winRate = avaliados > 0 ? ((acertos / avaliados) * 100).toFixed(0) : 0;
+
     return {
       key,
       n: dados.length,
@@ -45,6 +58,7 @@ function calcBloco(matches) {
       mediaReal: mediaReal.toFixed(2),
       vies: vies.toFixed(2),
       mae: mae.toFixed(2),
+      winRate,
       avaliacao: Math.abs(vies) < 0.3 ? "✓ Calibrado" : Math.abs(vies) < 0.7 ? "⚠ Leve viés" : "✗ Revisar",
       cor: Math.abs(vies) < 0.3 ? "text-emerald-600" : Math.abs(vies) < 0.7 ? "text-amber-600" : "text-red-600",
     };
@@ -141,6 +155,10 @@ export default function CalibrationView() {
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">MAE</span>
                           <span className="font-medium">{s.mae}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">Taxa Acerto</span>
+                          <span className="font-bold text-slate-900">{s.winRate}%</span>
                         </div>
                         <p className={`text-xs font-semibold mt-2 ${s.cor}`}>{s.avaliacao}</p>
                       </>

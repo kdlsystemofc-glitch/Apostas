@@ -183,7 +183,7 @@ function calcCorners(atk, def_, isHome = false) {
   };
 
   const defensivos = {
-    gk_saves: [0.50, resistencia(g(def_, "gk_saves", "c"), g(atk, "shots_on_target"))],
+    gk_saves: [0.50, resistencia(g(def_, "gk_saves", "t"), g(atk, "shots_on_target"))],
     clearances: [0.25, resistencia(g(def_, "clearances", "c"), g(atk, "shots_in_box"))],
     shots_ced: [0.25, resistencia(g(def_, "shots_on_target", "c"), g(atk, "shots_on_target"))],
   };
@@ -227,7 +227,7 @@ function calcGols(atk, def_, isHome = false) {
   };
 
   const defensivos = {
-    gk_saves:   [0.42, resistencia(g(def_, "gk_saves", "c"), g(atk, "shots_on_target"))],
+    gk_saves:   [0.42, resistencia(g(def_, "gk_saves", "t"), g(atk, "shots_on_target"))],
     shots_ced:  [0.26, resistencia(g(def_, "shots_on_target", "c"), g(atk, "shots_on_target"))],
     clearances: [0.16, resistencia(g(def_, "clearances", "c"), g(atk, "shots_in_box"))],
     errors:     [0.16, indice(g(atk, "errors_goal"), Math.max(g(def_, "errors_goal", "c"), 0.01))],
@@ -262,14 +262,19 @@ function calcShotsOnTarget(atk, def_, isHome = false) {
   };
 
   const defensivos = {
-    gk_saves: [0.60, resistencia(g(def_, "gk_saves", "c"), g(atk, "shots_on_target"))],
+    gk_saves: [0.60, resistencia(g(def_, "gk_saves", "t"), g(atk, "shots_on_target"))],
     clearances: [0.40, resistencia(g(def_, "clearances", "c"), g(atk, "shots_in_box"))],
   };
 
   const io = pesosDinamicos(ofensivos);
   const id_ = pesosDinamicos(defensivos);
   const ic = 0.60 * io + 0.40 * id_;
-  const xs = base * ic;
+  let xs = base * ic;
+  if (isHome) {
+    xs *= 1.05;
+  } else {
+    xs *= 0.95;
+  }
 
   return {
     value: Math.round(xs * 100) / 100,
@@ -286,19 +291,11 @@ function calcBTTS(statsCasa, statsFora) {
   const pForaMarca = 1 - Math.exp(-xgFora);
   let pBtts = pCasaMarca * pForaMarca;
 
-  // Correção de correlação negativa: jogos de baixo xG total tendem a
-  // ser mais defensivos, reduzindo a chance real de ambos marcarem
-  // além do que a independência estatística sugere.
+  // Correção de correlação contínua (função logística suave sem saltos em degrau)
   const xgTotal = xgCasa + xgFora;
-  if (xgTotal < 2.0) {
-    pBtts *= 0.65;
-  } else if (xgTotal < 3.0) {
-    pBtts *= 0.78;
-  } else if (xgTotal < 3.8) {
-    pBtts *= 0.88;
-  } else if (xgTotal < 4.5) {
-    pBtts *= 0.94;
-  }
+  const fatorCorrela = 1 / (1 + Math.exp(-1.3 * (xgTotal - 2.8)));
+  const desconto = 0.62 + 0.36 * fatorCorrela;
+  pBtts *= desconto;
   pBtts = Math.max(0, Math.min(1, pBtts));
 
   return {
@@ -391,8 +388,14 @@ function calcTotalShots(atk, def_, isHome = false) {
     crosses:            [0.13, indice(g(atk, "crosses"),            g(def_, "crosses",            "c"))],
   };
   const ic = pesosDinamicos(fatores);
+  let xt = base * ic;
+  if (isHome) {
+    xt *= 1.08;
+  } else {
+    xt *= 0.92;
+  }
   return {
-    value: Math.round(base * ic * 100) / 100,
+    value: Math.round(xt * 100) / 100,
     details: { base: Math.round(base * 1000) / 1000, ic: Math.round(ic * 10000) / 10000 },
     lowConfidence: true,
   };

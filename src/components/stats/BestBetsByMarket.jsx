@@ -28,8 +28,9 @@ function bestLine(xTotal, lines, sinalFn = sinalPoisson, dynamic = false, overMa
   const candidatas = dynamic ? linhasDinamicas(xTotal) : lines;
   if (!candidatas || candidatas.length === 0) return null;
 
-  let bestOver = null;
-  let bestUnder = null;
+  const linhaPrincipal = Math.floor(xTotal) + 0.5;
+  let best = null;
+  let bestScore = -Infinity;
 
   for (const linha of candidatas) {
     const probBruta = poissonOver(xTotal, linha);
@@ -37,28 +38,20 @@ function bestLine(xTotal, lines, sinalFn = sinalPoisson, dynamic = false, overMa
       ? calibrarProb(probBruta, overMap, linha)
       : probBruta;
     const sinal = sinalFn(prob);
-    const strength = Math.abs(prob - 0.5);
 
-    if (prob >= 0.5) {
-      if (!bestOver || strength > bestOver.strength) {
-        bestOver = { linha, prob, sinal, strength };
-      }
-    } else {
-      if (!bestUnder || strength > bestUnder.strength) {
-        bestUnder = { linha, prob, sinal, strength };
-      }
+    // Penaliza linhas muito distantes da linha principal de aposta do mercado real
+    const dist = Math.abs(linha - linhaPrincipal);
+    const distPenalty = dist * 0.12;
+    const signalBonus = sinal.label.includes("FORTE") ? 0.35 : sinal.label !== "NEUTRO" ? 0.18 : 0;
+    const score = (1 - distPenalty) + signalBonus + (prob >= 0.5 ? 0.05 : 0);
+
+    if (!best || score > bestScore) {
+      bestScore = score;
+      best = { linha, prob, sinal, strength: Math.abs(prob - 0.5) };
     }
   }
 
-  // Prioriza Over se o sinal for mais forte OU se Over já tiver sinal claro
-  // Só usa Under quando Over não tem sinal significativo (< 65%)
-  if (bestOver && bestOver.sinal.label !== "NEUTRO") return bestOver;
-  if (bestUnder && bestUnder.sinal.label !== "NEUTRO") return bestUnder;
-  // Ambos neutros: retorna o de maior força
-  if (bestOver && bestUnder) {
-    return bestOver.strength >= bestUnder.strength ? bestOver : bestUnder;
-  }
-  return bestOver || bestUnder;
+  return best;
 }
 
 export default function BestBetsByMarket({ match, leagueProfile }) {
