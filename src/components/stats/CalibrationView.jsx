@@ -31,8 +31,11 @@ function calcBloco(matches) {
       .map(m => ({ p: prev(m), r: real(m) }))
       .filter(d => d.p !== null && d.p !== undefined && d.r !== null && d.r !== undefined);
     
-    if (dados.length < 3) return { key, status: "insuficiente", n: dados.length };
-    
+    const mediaPrev = dados.reduce((s, d) => s + d.p, 0) / dados.length;
+    const mediaReal = dados.reduce((s, d) => s + d.r, 0) / dados.length;
+    const vies = mediaPrev - mediaReal;
+    const mae = dados.reduce((s, d) => s + Math.abs(d.p - d.r), 0) / dados.length;
+
     // Sucesso dos sinais (se real acertou a linha principal prevista)
     let acertos = 0;
     let avaliados = 0;
