@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════
-// PREDICTION ENGINE — Port of Python predict.py
+// PREDICTION ENGINE — MOTOR AUTÔNOMO DE PREVISÃO ESTATÍSTICA
 // ══════════════════════════════════════════════════════════════
 
 const STAT_MAP = {
@@ -34,24 +34,37 @@ const STAT_MAP = {
   "Errors Lead To Shot": "errors_shot",
 };
 
+// ── Linhas Comerciais Reais de Apostas (Bet365 / Pinnacle / Superbet) ──
+export const COMMERCIAL_LINES = {
+  goals_total:        [1.5, 2.5, 3.5, 4.5],
+  goals_team:         [0.5, 1.5, 2.5],
+  corners_total:      [7.5, 8.5, 9.5, 10.5, 11.5, 12.5],
+  corners_team:       [3.5, 4.5, 5.5, 6.5],
+  cards_total:        [3.5, 4.5, 5.5, 6.5],
+  cards_team:         [1.5, 2.5, 3.5],
+  shots_target_total: [7.5, 8.5, 9.5, 10.5],
+  shots_target_team:  [3.5, 4.5, 5.5],
+  total_shots_total:  [21.5, 23.5, 25.5, 27.5],
+  total_shots_team:   [10.5, 12.5, 14.5],
+  saves_total:        [5.5, 6.5, 7.5],
+  saves_team:         [2.5, 3.5, 4.5],
+  fouls_total:        [22.5, 24.5, 26.5],
+  fouls_team:         [10.5, 12.5, 14.5],
+};
+
 // ── Parse pasted StatsHub data ──
-// Detecta automaticamente o formato: Excel (nome + médias na mesma linha)
-// ou StatsHub direto (nome do stat em linha isolada, médias na linha seguinte)
 export function parseStatsHubText(text) {
   const stats = {};
   const lines = text.trim().split("\n");
 
   function extrairMedias(line) {
-    // Pega todos os números da linha (inteiros e decimais)
     const parts = line.split("\t").map(p => p.trim()).filter(p => p);
     const nums = parts
       .map(p => parseFloat(p))
       .filter(n => !isNaN(n));
-    // Precisa de ao menos 3 números: total, time, cedida
     return nums.length >= 3 ? nums : null;
   }
 
-  // Tenta formato EXCEL primeiro (mais rápido — verifica a 1ª linha válida)
   const primeiraLinhaValida = lines.find(l => {
     const cols = l.split("\t");
     return cols[0]?.trim() && STAT_MAP[cols[0]?.trim()];
@@ -61,7 +74,6 @@ export function parseStatsHubText(text) {
     const cols = primeiraLinhaValida.split("\t");
     const nums = extrairMedias(primeiraLinhaValida.split("\t").slice(1).join("\t"));
     if (nums && nums.length >= 3 && cols.length >= 4) {
-      // ── FORMATO EXCEL ──────────────────────────────────────
       for (const line of lines) {
         if (!line.trim()) continue;
         const cols = line.split("\t");
@@ -77,15 +89,12 @@ export function parseStatsHubText(text) {
     }
   }
 
-  // ── FORMATO STATSHUB DIRETO ──────────────────────────────
-  // Nome do stat em linha isolada, médias na linha seguinte
   let i = 0;
   while (i < lines.length) {
     const lineName = lines[i].split("\t")[0]?.trim();
 
     if (lineName && STAT_MAP[lineName]) {
       const key = STAT_MAP[lineName];
-      // Busca a linha das médias nas próximas 4 linhas
       let found = false;
       for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
         const nums = extrairMedias(lines[j]);
@@ -160,7 +169,6 @@ export function sinalPoisson(prob) {
 }
 
 export function sinalPoissonGols(prob) {
-  // Threshold mais alto que o padrão — gols têm zona OVER pouco confiável
   if (prob >= 0.78) return { label: "FORTE OVER", color: "green" };
   if (prob >= 0.70) return { label: "OVER", color: "yellow" };
   if (prob <= 0.22) return { label: "FORTE UNDER", color: "red" };
@@ -173,19 +181,18 @@ function calcCorners(atk, def_, isHome = false) {
   const base = ancora(g(atk, "corners"), g(def_, "corners", "c"));
 
   const ofensivos = {
-    shots_on_target:   [0.27, indice(g(atk, "shots_on_target"),   g(def_, "shots_on_target",   "c"))],
-    shots_in_box:      [0.22, indice(g(atk, "shots_in_box"),      g(def_, "shots_in_box",      "c"))],
-    big_chance_missed: [0.13, indice(g(atk, "big_chance_missed"), g(def_, "big_chance_missed", "c"))],
-    crosses:           [0.13, indice(g(atk, "crosses"),           g(def_, "crosses",           "c"))],
-    touches_opp_box:   [0.13, indice(g(atk, "touches_opp_box"),   g(def_, "touches_opp_box",   "c"))],
-    total_shots:       [0.10, indice(g(atk, "total_shots"),       g(def_, "total_shots",       "c"))],
-    possession:        [0.08, indice(g(atk, "possession", "t"),   g(def_, "possession", "c"))],
+    shots_on_target:   [0.25, indice(g(atk, "shots_on_target"),   g(def_, "shots_on_target",   "c"))],
+    shots_in_box:      [0.25, indice(g(atk, "shots_in_box"),      g(def_, "shots_in_box",      "c"))],
+    crosses:           [0.20, indice(g(atk, "crosses"),           g(def_, "crosses",           "c"))],
+    touches_opp_box:   [0.15, indice(g(atk, "touches_opp_box"),   g(def_, "touches_opp_box",   "c"))],
+    big_chance_missed: [0.10, indice(g(atk, "big_chance_missed"), g(def_, "big_chance_missed", "c"))],
+    total_shots:       [0.05, indice(g(atk, "total_shots"),       g(def_, "total_shots",       "c"))],
   };
 
   const defensivos = {
-    gk_saves: [0.50, resistencia(g(def_, "gk_saves", "t"), g(atk, "shots_on_target"))],
-    clearances: [0.25, resistencia(g(def_, "clearances", "c"), g(atk, "shots_in_box"))],
-    shots_ced: [0.25, resistencia(g(def_, "shots_on_target", "c"), g(atk, "shots_on_target"))],
+    clearances: [0.40, resistencia(g(def_, "clearances", "c"), g(atk, "shots_in_box"))],
+    shots_ced:  [0.35, resistencia(g(def_, "shots_on_target", "c"), g(atk, "shots_on_target"))],
+    gk_saves:   [0.25, resistencia(g(def_, "gk_saves", "t"), g(atk, "shots_on_target"))],
   };
 
   const io = pesosDinamicos(ofensivos);
@@ -193,7 +200,7 @@ function calcCorners(atk, def_, isHome = false) {
   const ic = 0.60 * io + 0.40 * id_;
   let xc = base * ic;
   if (isHome) {
-    xc *= 1.18;
+    xc *= 1.12;
   }
 
   return {
@@ -203,12 +210,6 @@ function calcCorners(atk, def_, isHome = false) {
       indice_ofensivo: Math.round(io * 10000) / 10000,
       indice_defensivo: Math.round(id_ * 10000) / 10000,
       indice_composto: Math.round(ic * 10000) / 10000,
-      detalhes_of: Object.fromEntries(
-        Object.entries(ofensivos).map(([k, [p, v]]) => [k, [p, Math.round(v * 1000) / 1000]])
-      ),
-      detalhes_def: Object.fromEntries(
-        Object.entries(defensivos).map(([k, [p, v]]) => [k, [p, Math.round(v * 1000) / 1000]])
-      ),
     },
   };
 }
@@ -218,19 +219,18 @@ function calcGols(atk, def_, isHome = false) {
   const base = ancora(g(atk, "goals"), g(def_, "goals", "c"));
 
   const ofensivos = {
-    xg:                 [0.22, indice(g(atk, "xg"),                 g(def_, "xg",                 "c"))],
+    xg:                 [0.25, indice(g(atk, "xg"),                 g(def_, "xg",                 "c"))],
+    shots_on_target:    [0.25, indice(g(atk, "shots_on_target"),    g(def_, "shots_on_target",    "c"))],
     big_chance_scored:  [0.20, indice(g(atk, "big_chance_scored"),  g(def_, "big_chance_scored",  "c"))],
-    shots_on_target:    [0.20, indice(g(atk, "shots_on_target"),    g(def_, "shots_on_target",    "c"))],
-    shots_in_box:       [0.13, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],
-    touches_opp_box:    [0.13, indice(g(atk, "touches_opp_box"),    g(def_, "touches_opp_box",    "c"))],
-    big_chance_created: [0.12, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
+    shots_in_box:       [0.15, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],
+    touches_opp_box:    [0.15, indice(g(atk, "touches_opp_box"),    g(def_, "touches_opp_box",    "c"))],
   };
 
   const defensivos = {
-    gk_saves:   [0.42, resistencia(g(def_, "gk_saves", "t"), g(atk, "shots_on_target"))],
-    shots_ced:  [0.26, resistencia(g(def_, "shots_on_target", "c"), g(atk, "shots_on_target"))],
-    clearances: [0.16, resistencia(g(def_, "clearances", "c"), g(atk, "shots_in_box"))],
-    errors:     [0.16, indice(g(atk, "errors_goal"), Math.max(g(def_, "errors_goal", "c"), 0.01))],
+    shots_ced:  [0.45, resistencia(g(def_, "shots_on_target", "c"), g(atk, "shots_on_target"))],
+    clearances: [0.25, resistencia(g(def_, "clearances", "c"), g(atk, "shots_in_box"))],
+    errors:     [0.20, indice(g(atk, "errors_goal"), Math.max(g(def_, "errors_goal", "c"), 0.01))],
+    gk_saves:   [0.10, resistencia(g(def_, "gk_saves", "t"), g(atk, "shots_on_target"))],
   };
 
   const io = pesosDinamicos(ofensivos);
@@ -238,9 +238,9 @@ function calcGols(atk, def_, isHome = false) {
   const ic = 0.55 * io + 0.45 * id_;
   let xg = base * ic;
   if (isHome) {
-    xg *= 1.08;
+    xg *= 1.06;
   } else {
-    xg *= 0.92;
+    xg *= 0.94;
   }
 
   return {
@@ -254,15 +254,14 @@ function calcShotsOnTarget(atk, def_, isHome = false) {
   const base = ancora(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c"));
 
   const ofensivos = {
-    shots_in_box:       [0.36, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],
-    big_chance_created: [0.23, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
-    total_shots:        [0.18, indice(g(atk, "total_shots"),        g(def_, "total_shots",        "c"))],
-    touches_opp_box:    [0.13, indice(g(atk, "touches_opp_box"),    g(def_, "touches_opp_box",    "c"))],
-    possession:         [0.10, indice(g(atk, "possession", "t"),    g(def_, "possession", "c"))],
+    shots_in_box:       [0.40, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],
+    big_chance_created: [0.25, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
+    total_shots:        [0.20, indice(g(atk, "total_shots"),        g(def_, "total_shots",        "c"))],
+    touches_opp_box:    [0.15, indice(g(atk, "touches_opp_box"),    g(def_, "touches_opp_box",    "c"))],
   };
 
   const defensivos = {
-    gk_saves: [0.60, resistencia(g(def_, "gk_saves", "t"), g(atk, "shots_on_target"))],
+    shots_ced:  [0.60, resistencia(g(def_, "shots_on_target", "c"), g(atk, "shots_on_target"))],
     clearances: [0.40, resistencia(g(def_, "clearances", "c"), g(atk, "shots_in_box"))],
   };
 
@@ -271,9 +270,9 @@ function calcShotsOnTarget(atk, def_, isHome = false) {
   const ic = 0.60 * io + 0.40 * id_;
   let xs = base * ic;
   if (isHome) {
-    xs *= 1.05;
+    xs *= 1.04;
   } else {
-    xs *= 0.95;
+    xs *= 0.96;
   }
 
   return {
@@ -291,11 +290,6 @@ function calcBTTS(statsCasa, statsFora) {
   const pForaMarca = 1 - Math.exp(-xgFora);
   let pBtts = pCasaMarca * pForaMarca;
 
-  // Correção de correlação contínua (função logística suave sem saltos em degrau)
-  const xgTotal = xgCasa + xgFora;
-  const fatorCorrela = 1 / (1 + Math.exp(-1.3 * (xgTotal - 2.8)));
-  const desconto = 0.62 + 0.36 * fatorCorrela;
-  pBtts *= desconto;
   pBtts = Math.max(0, Math.min(1, pBtts));
 
   return {
@@ -313,22 +307,19 @@ function calcBTTS(statsCasa, statsFora) {
 function calcCartoes(atk, def_, isHome = false) {
   const baseMedia = ancora(g(atk, "cards"), g(def_, "cards", "c"));
   const baseMax = Math.max(g(atk, "cards"), g(def_, "cards", "c"));
-  const base = baseMedia * 0.90 + baseMax * 0.10;
+  const base = baseMedia * 0.80 + baseMax * 0.20;
 
   const fatores = {
-    fouls:           [0.25, indice(g(atk, "fouls"),           g(def_, "fouls",           "c"))],
-    tackles:         [0.20, indice(g(atk, "tackles"),         g(def_, "tackles",         "c"))],
-    interceptions:   [0.16, indice(g(atk, "interceptions"),   g(def_, "interceptions",   "c"))],
-    dispossessed:    [0.15, indice(g(atk, "dispossessed"),    g(def_, "dispossessed",    "c"))],
-    free_kicks_ced:  [0.12, indice(g(def_, "free_kicks"), Math.max(g(atk, "free_kicks"), 0.01))],
-    yellow_hist:     [0.07, indice(g(atk, "yellow_cards"), Math.max(g(def_, "yellow_cards", "c"), 0.01))],
-    offsides:        [0.05, indice(g(atk, "offsides"), Math.max(g(def_, "offsides", "c"), 0.01))],
+    yellow_hist:   [0.35, indice(g(atk, "yellow_cards"), Math.max(g(def_, "yellow_cards", "c"), 0.01))],
+    fouls:         [0.30, indice(g(atk, "fouls"),         g(def_, "fouls",           "c"))],
+    tackles:       [0.20, indice(g(atk, "tackles"),       g(def_, "tackles",         "c"))],
+    interceptions: [0.15, indice(g(atk, "interceptions"), g(def_, "interceptions",   "c"))],
   };
 
   const ic = pesosDinamicos(fatores);
   let xc = base * ic;
   if (isHome) {
-    xc *= 0.92;
+    xc *= 0.95;
   }
 
   return {
@@ -340,15 +331,13 @@ function calcCartoes(atk, def_, isHome = false) {
 // ── Market 6: Faltas ──
 function calcFaltas(atk, def_) {
   const baseRaw = ancora(g(atk, "fouls"), g(def_, "fouls", "c"));
-  const mult = baseRaw < 18 ? 1.28 : baseRaw < 22 ? 1.18 : 1.10;
+  const mult = baseRaw < 18 ? 1.20 : baseRaw < 22 ? 1.12 : 1.05;
   const base = baseRaw * mult;
   const fatores = {
-    fouls:         [0.30, indice(g(atk, "fouls"),         g(def_, "fouls",         "c"))],
-    tackles:       [0.22, indice(g(atk, "tackles"),       g(def_, "tackles",       "c"))],
-    interceptions: [0.18, indice(g(atk, "interceptions"), g(def_, "interceptions", "c"))],
-    dispossessed:  [0.15, indice(g(atk, "dispossessed"),  g(def_, "dispossessed",  "c"))],
-    crosses:       [0.10, indice(g(atk, "crosses"),       g(def_, "crosses",       "c"))],
-    offsides:      [0.05, indice(g(atk, "offsides"),      Math.max(g(def_, "offsides", "c"), 0.01))],
+    fouls:         [0.40, indice(g(atk, "fouls"),         g(def_, "fouls",         "c"))],
+    tackles:       [0.30, indice(g(atk, "tackles"),       g(def_, "tackles",       "c"))],
+    interceptions: [0.20, indice(g(atk, "interceptions"), g(def_, "interceptions", "c"))],
+    dispossessed:  [0.10, indice(g(atk, "dispossessed"),  g(def_, "dispossessed",  "c"))],
   };
   const ic = pesosDinamicos(fatores);
   return {
@@ -358,16 +347,14 @@ function calcFaltas(atk, def_) {
 }
 
 // ── Market 7: Defesas do Goleiro ──
-// atk = time que ataca (gera os chutes), def_ = time cujo goleiro defende
 function calcSaves(atk, def_) {
-  const base = ancora(g(def_, "gk_saves", "t"), g(atk, "gk_saves", "c"));
+  const base = ancora(g(def_, "gk_saves", "t"), g(atk, "shots_on_target", "t"));
 
   const fatores = {
-    shots_on_target: [0.35, indice(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c"))],
-    shots_in_box:    [0.22, indice(g(atk, "shots_in_box"),    g(def_, "shots_in_box",    "c"))],
-    big_chance_crtd: [0.18, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
-    total_shots:     [0.13, indice(g(atk, "total_shots"),     g(def_, "total_shots",     "c"))],
-    xg:              [0.12, indice(g(atk, "xg"), Math.max(g(def_, "xg", "c"), 0.01))],
+    shots_on_target: [0.45, indice(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c"))],
+    shots_in_box:    [0.25, indice(g(atk, "shots_in_box"),    g(def_, "shots_in_box",    "c"))],
+    big_chance_crtd: [0.15, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
+    total_shots:     [0.15, indice(g(atk, "total_shots"),     g(def_, "total_shots",     "c"))],
   };
 
   const ic = pesosDinamicos(fatores);
@@ -381,26 +368,25 @@ function calcSaves(atk, def_) {
 function calcTotalShots(atk, def_, isHome = false) {
   const base = ancora(g(atk, "total_shots"), g(def_, "total_shots", "c"));
   const fatores = {
-    shots_in_box:       [0.26, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],
-    touches_opp_box:    [0.26, indice(g(atk, "touches_opp_box"),    g(def_, "touches_opp_box",    "c"))],
-    big_chance_created: [0.22, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
-    possession:         [0.13, indice(g(atk, "possession", "t"),    g(def_, "possession", "c"))],
-    crosses:            [0.13, indice(g(atk, "crosses"),            g(def_, "crosses",            "c"))],
+    total_shots:        [0.40, indice(g(atk, "total_shots"),        g(def_, "total_shots",        "c"))],
+    shots_in_box:       [0.25, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],
+    touches_opp_box:    [0.20, indice(g(atk, "touches_opp_box"),    g(def_, "touches_opp_box",    "c"))],
+    big_chance_created: [0.15, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
   };
   const ic = pesosDinamicos(fatores);
   let xt = base * ic;
   if (isHome) {
-    xt *= 1.08;
+    xt *= 1.05;
   } else {
-    xt *= 0.92;
+    xt *= 0.95;
   }
   return {
     value: Math.round(xt * 100) / 100,
     details: { base: Math.round(base * 1000) / 1000, ic: Math.round(ic * 10000) / 10000 },
-    lowConfidence: true,
   };
 }
 
+// ── Market 1X2 com Ajuste Dixon-Coles e Declaração Estrita de Vitória/Empate ──
 function calcResultado(xgCasa, xgFora) {
   const maxGols = 8;
   let pCasa = 0, pEmpate = 0, pFora = 0;
@@ -412,30 +398,67 @@ function calcResultado(xgCasa, xgFora) {
     return Math.exp(-lambda) * Math.pow(lambda, k) / r;
   }
 
+  function dixonColesTau(x, y, lambda1, lambda2, rho = -0.13) {
+    if (x === 0 && y === 0) return 1 - (lambda1 * lambda2 * rho);
+    if (x === 1 && y === 0) return 1 + (lambda1 * rho);
+    if (x === 0 && y === 1) return 1 + (lambda2 * rho);
+    if (x === 1 && y === 1) return 1 - rho;
+    return 1.0;
+  }
+
   for (let i = 0; i <= maxGols; i++) {
     for (let j = 0; j <= maxGols; j++) {
-      const p = poissonPMF(i, xgCasa) * poissonPMF(j, xgFora);
-      placares.push({ home: i, away: j, prob: p });
-      if (i > j) pCasa += p;
-      else if (i === j) pEmpate += p;
-      else pFora += p;
+      const tau = dixonColesTau(i, j, xgCasa, xgFora);
+      const p = poissonPMF(i, xgCasa) * poissonPMF(j, xgFora) * tau;
+      placares.push({ home: i, away: j, prob: Math.max(0, p) });
+      if (i > j) pCasa += Math.max(0, p);
+      else if (i === j) pEmpate += Math.max(0, p);
+      else pFora += Math.max(0, p);
     }
   }
 
+  const totalP = pCasa + pEmpate + pFora;
+  if (totalP > 0) {
+    pCasa /= totalP;
+    pEmpate /= totalP;
+    pFora /= totalP;
+  }
+
   placares.sort((a, b) => b.prob - a.prob);
+
+  let resultadoEstrito = "Vitória Casa";
+  let probVencedora = pCasa;
+
+  if (pEmpate > pCasa && pEmpate > pFora) {
+    resultadoEstrito = "Empate";
+    probVencedora = pEmpate;
+  } else if (pFora > pCasa && pFora > pEmpate) {
+    resultadoEstrito = "Vitória Fora";
+    probVencedora = pFora;
+  } else {
+    resultadoEstrito = "Vitória Casa";
+    probVencedora = pCasa;
+  }
+
+  const oddMinima = Math.max(1.01, Math.round((1 / probVencedora) * 100) / 100);
 
   return {
     p_casa_vence: Math.round(pCasa * 10000) / 10000,
     p_empate:     Math.round(pEmpate * 10000) / 10000,
     p_fora_vence: Math.round(pFora * 10000) / 10000,
+    pick_1x2: {
+      resultado: resultadoEstrito,
+      prob: Math.round(probVencedora * 10000) / 10000,
+      odd_minima: oddMinima,
+    },
     placares_top5: placares.slice(0, 5).map(p => ({
       placar: `${p.home}×${p.away}`,
-      prob: Math.round(p.prob * 10000) / 10000,
+      prob: Math.round((p.prob / (totalP || 1)) * 10000) / 10000,
     })),
   };
 }
 
-// ── Full match analysis ──
+// ── Full match analysis (100% Autônomo sem FootyStats) ──
 export function analisarJogo(statsCasa, statsFora) {
   const corners_casa = calcCorners(statsCasa, statsFora, true);
   const corners_fora = calcCorners(statsFora, statsCasa, false);
@@ -463,6 +486,7 @@ export function analisarJogo(statsCasa, statsFora) {
     p_casa_vence: resultado.p_casa_vence,
     p_empate: resultado.p_empate,
     p_fora_vence: resultado.p_fora_vence,
+    pick_1x2: resultado.pick_1x2,
     placares_top5: resultado.placares_top5,
 
     xc_casa: corners_casa.value,
@@ -497,7 +521,6 @@ export function analisarJogo(statsCasa, statsFora) {
     xtotalshots_casa: totalshots_casa.value,
     xtotalshots_fora: totalshots_fora.value,
     xtotalshots_total: Math.round((totalshots_casa.value + totalshots_fora.value) * 100) / 100,
-
   };
 }
 

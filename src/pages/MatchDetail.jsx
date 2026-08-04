@@ -18,32 +18,24 @@ export default function MatchDetail() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [realResults, setRealResults] = useState({});
-  const [leagueProfile, setLeagueProfile] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => {
     base44.entities.Match.get(id).then((m) => {
       setMatch(m);
       setRealResults(m.real_results || {});
-      if (m.league_profile_id) {
-        base44.entities.LeagueProfile.get(m.league_profile_id)
-          .then(setLeagueProfile)
-          .catch(() => setLeagueProfile(null));
-      }
     }).finally(() => setLoading(false));
   }, [id]);
 
   const handleSaveReal = async () => {
     try {
       const updated = { ...realResults };
-      // BTTS calculado automaticamente pelos gols
       const gh = updated.goals_home;
       const ga = updated.goals_away;
       if (gh !== "" && gh !== undefined && ga !== "" && ga !== undefined) {
         updated.btts = (Number(gh) > 0 && Number(ga) > 0) ? 1 : 0;
       }
 
-      // Calcula totais automaticamente
       const pairs = [
         ["corners_home", "corners_away"],
         ["goals_home", "goals_away"],
@@ -112,8 +104,8 @@ export default function MatchDetail() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
+      <header className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
           <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
@@ -124,9 +116,9 @@ export default function MatchDetail() {
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
         <MatchResultBlock match={match} />
-        <MatchResults match={match} leagueProfile={leagueProfile} />
+        <MatchResults match={match} />
 
-        <BestBetsByMarket match={match} leagueProfile={leagueProfile} />
+        <BestBetsByMarket match={match} />
 
         {match.results?.dc && (
           <CornerDetails match={match} />
@@ -134,10 +126,10 @@ export default function MatchDetail() {
 
         {/* Real Results Section */}
         <div className="rounded-xl border bg-card overflow-hidden">
-          <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
+          <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 dark:bg-amber-950/40 dark:border-amber-900 flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-amber-900">Resultados Reais</h3>
-              <p className="text-xs text-amber-700 mt-0.5">Preencha após o jogo para calibrar o modelo</p>
+              <h3 className="font-semibold text-amber-900 dark:text-amber-200">Resultados Reais</h3>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">Preencha após o jogo para calibrar o modelo</p>
             </div>
             {!editing ? (
               <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="gap-1.5">
@@ -168,14 +160,14 @@ export default function MatchDetail() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {realFields.map(({ key, label }) => (
-                  <div key={key} className="rounded-lg bg-slate-50 p-3">
+                  <div key={key} className="rounded-lg bg-slate-50 dark:bg-slate-900 p-3 border">
                     <p className="text-xs text-muted-foreground">{label}</p>
                     <p className="text-lg font-bold mt-0.5">
                       {realResults[key] !== undefined && realResults[key] !== "" ? realResults[key] : "—"}
                     </p>
                   </div>
                 ))}
-                <div className="rounded-lg bg-slate-100 p-3 border border-slate-200">
+                <div className="rounded-lg bg-slate-100 dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700">
                   <p className="text-xs text-muted-foreground">BTTS (auto)</p>
                   <p className="text-lg font-bold mt-0.5">
                     {realResults.btts === 1 ? "✓ Sim" : realResults.btts === 0 ? "✗ Não" : "—"}

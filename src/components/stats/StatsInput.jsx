@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,14 +14,8 @@ export default function StatsInput({ onAnalysisComplete }) {
   const [homeText, setHomeText] = useState("");
   const [awayText, setAwayText] = useState("");
   const [matchDate, setMatchDate] = useState(new Date().toISOString().split("T")[0]);
-  const [leagueProfileId, setLeagueProfileId] = useState("");
-  const [leagueProfiles, setLeagueProfiles] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    base44.entities.LeagueProfile.list("-created_date", 50)
-      .then(setLeagueProfiles);
-  }, []);
   const { toast } = useToast();
 
   const homeStatsCount = Object.keys(parseStatsHubText(homeText)).length;
@@ -50,28 +44,26 @@ export default function StatsInput({ onAnalysisComplete }) {
         return;
       }
 
+      // Análise 100% Autônoma pelo Motor Estatístico sem interferência externa
       const results = analisarJogo(homeStats, awayStats);
 
       const match = await base44.entities.Match.create({
         home_team: homeTeam.trim(),
         away_team: awayTeam.trim(),
         date: matchDate,
-        league_profile_id: leagueProfileId || null,
         home_stats: homeStats,
         away_stats: awayStats,
         results,
         status: "pending",
       });
 
-      const selectedProfile = leagueProfiles.find(lp => lp.id === leagueProfileId) || null;
       toast({ title: "Análise concluída!", description: `${homeTeam} vs ${awayTeam}` });
-      onAnalysisComplete?.(match, selectedProfile);
+      onAnalysisComplete?.(match);
 
       setHomeTeam("");
       setAwayTeam("");
       setHomeText("");
       setAwayText("");
-      setLeagueProfileId("");
     } catch (err) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
@@ -84,24 +76,6 @@ export default function StatsInput({ onAnalysisComplete }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Campeonato <span className="text-slate-400">(opcional)</span>
-        </Label>
-        <select
-          value={leagueProfileId}
-          onChange={e => setLeagueProfileId(e.target.value)}
-          className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="">— Sem perfil de liga —</option>
-          {leagueProfiles.map(lp => (
-            <option key={lp.id} value={lp.id}>
-              {lp.name} {lp.season ? `(${lp.season})` : ""}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">🏠 Time da Casa (mandante)</Label>

@@ -1,56 +1,113 @@
-import React from "react";
+import React, { useState } from "react";
 import { poissonOver, sinalPoisson } from "@/lib/predictionEngine";
 import SignalBadge from "./SignalBadge";
 
 export default function MarketBlock({ icon, title, homeName, awayName, xHome, xAway, xTotal, lines, sinalFn, warning }) {
   const useSinal = sinalFn || sinalPoisson;
 
+  // Encontra a linha mais próxima do valor esperado para destacar como linha principal
   const closestLine = (lines && lines.length > 0 && xTotal != null)
     ? lines.reduce((a, b) => Math.abs(a - xTotal) < Math.abs(b - xTotal) ? a : b)
-    : null;
+    : lines?.[0];
+
+  const bestProb = closestLine != null ? poissonOver(xTotal, closestLine) : 0;
+  const bestOdd = bestProb > 0 ? Math.max(1.01, Math.round((1 / bestProb) * 100) / 100) : "—";
+  const bestSignal = useSinal(bestProb);
 
   return (
-    <div className="rounded-xl border bg-card overflow-hidden">
+    <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
       <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-lg flex-shrink-0">{icon}</span>
           <h3 className="font-semibold tracking-tight text-sm sm:text-base truncate">{title}</h3>
         </div>
+        {closestLine != null && (
+          <span className="text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2.5 py-1 rounded-full">
+            Linha Base: Over {closestLine}
+          </span>
+        )}
       </div>
 
       <div className="divide-y">
+        {/* Box da Médias e Recomendação Principal */}
         <div className="grid grid-cols-3 text-center text-sm">
-          <div className="px-3 py-3 bg-slate-50">
-            <p className="text-xs text-muted-foreground mb-0.5 truncate">{homeName}</p>
-            <p className="text-lg sm:text-xl font-bold text-slate-900">{xHome ?? "—"}</p>
+          <div className="px-3 py-3 bg-slate-50 dark:bg-slate-900/50">
+            <p className="text-xs text-muted-foreground mb-0.5 truncate font-medium">{homeName}</p>
+            <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{xHome ?? "—"}</p>
           </div>
-          <div className="px-3 py-3 bg-slate-50">
-            <p className="text-xs text-muted-foreground mb-0.5 truncate">{awayName}</p>
-            <p className="text-lg sm:text-xl font-bold text-slate-900">{xAway ?? "—"}</p>
+          <div className="px-3 py-3 bg-slate-50 dark:bg-slate-900/50">
+            <p className="text-xs text-muted-foreground mb-0.5 truncate font-medium">{awayName}</p>
+            <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{xAway ?? "—"}</p>
           </div>
-          <div className="px-3 py-3 bg-blue-50">
-            <p className="text-xs text-muted-foreground mb-0.5 truncate">Total Esperado</p>
-            <p className="text-lg sm:text-xl font-bold text-blue-700">{xTotal}</p>
+          <div className="px-3 py-3 bg-blue-50/70 dark:bg-blue-950/40">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-0.5 truncate font-bold">Total Projetado</p>
+            <p className="text-lg sm:text-xl font-extrabold text-blue-700 dark:text-blue-400">{xTotal}</p>
           </div>
         </div>
 
-        <div className="px-4 py-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Linhas Over/Under</p>
+        {/* Highlight da Recomendação da Linha de Valor */}
+        {closestLine != null && (
+          <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 block mb-0.5">
+                🔥 Linha Principal Recomendada
+              </span>
+              <p className="text-base font-extrabold text-white">
+                Over {closestLine} {title}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <span className="text-sm font-bold text-emerald-400 block">
+                  {(bestProb * 100).toFixed(1)}%
+                </span>
+                <span className="text-[11px] text-slate-300 font-medium">
+                  Odd Min: <strong className="text-white">{bestOdd}</strong>
+                </span>
+              </div>
+              <SignalBadge label={bestSignal.label} color={bestSignal.color} />
+            </div>
+          </div>
+        )}
+
+        {/* Tabela de Linhas Comerciais */}
+        <div className="px-4 py-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
+            Linhas Comerciais Disponíveis (Odds Mínimas EV+)
+          </p>
           <div className="space-y-1.5">
-            {lines.map(line => {
+            {lines?.map(line => {
               const prob = poissonOver(xTotal, line);
+              const oddMin = prob > 0 ? Math.max(1.01, Math.round((1 / prob) * 100) / 100) : "—";
               const sinal = useSinal(prob);
               const isClosest = line === closestLine;
+
               return (
                 <div
                   key={line}
-                  className={`flex items-center justify-between py-1.5 px-3 rounded-lg ${
-                    isClosest ? "bg-blue-50 border border-blue-200" : "bg-slate-50"
-                  } hover:bg-slate-100 transition-colors`}
+                  className={`flex items-center justify-between py-2 px-3.5 rounded-lg border transition-colors ${
+                    isClosest
+                      ? "bg-blue-50/80 border-blue-300 dark:bg-blue-950/30 dark:border-blue-700 shadow-sm"
+                      : "bg-slate-50 border-slate-200/60 dark:bg-slate-900/30 dark:border-slate-800"
+                  } hover:bg-slate-100 dark:hover:bg-slate-800`}
                 >
-                  <span className="text-sm font-medium text-slate-700">Over {line}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold tabular-nums">{(prob * 100).toFixed(1)}%</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">Over {line}</span>
+                    {isClosest && (
+                      <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase">
+                        Principal
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                        {(prob * 100).toFixed(1)}%
+                      </span>
+                      <span className="text-[11px] text-muted-foreground ml-2">
+                        Odd Min: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{oddMin}</strong>
+                      </span>
+                    </div>
                     <SignalBadge label={sinal.label} color={sinal.color} />
                   </div>
                 </div>
@@ -61,8 +118,8 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
       </div>
 
       {warning && (
-        <div className="px-4 py-2 bg-amber-50 border-t border-amber-100">
-          <p className="text-xs text-amber-700">{warning}</p>
+        <div className="px-4 py-2 bg-amber-50 border-t border-amber-200/60 dark:bg-amber-950/30 dark:border-amber-800">
+          <p className="text-xs text-amber-800 dark:text-amber-300 font-medium">{warning}</p>
         </div>
       )}
     </div>

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Plus, History, CalendarDays, TrendingUp, Download, Trophy } from "lucide-react";
+import { BarChart3, Plus, History, CalendarDays, TrendingUp, Download } from "lucide-react";
 import StatsInput from "@/components/stats/StatsInput";
 import MatchResults from "@/components/stats/MatchResults";
 import MatchHistory from "@/components/stats/MatchHistory";
@@ -11,19 +11,17 @@ import CalibrationView from "@/components/stats/CalibrationView";
 
 export default function Home() {
   const [lastMatch, setLastMatch] = useState(null);
-  const [lastLeagueProfile, setLastLeagueProfile] = useState(null);
   const [tab, setTab] = useState("new");
   const navigate = useNavigate();
 
-  const handleAnalysisComplete = (match, leagueProfile) => {
+  const handleAnalysisComplete = (match) => {
     setLastMatch(match);
-    setLastLeagueProfile(leagueProfile);
     setTab("results");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
+      <header className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center">
@@ -31,13 +29,10 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight">Sports Predictor</h1>
-              <p className="text-xs text-muted-foreground">Análise de mercados esportivos</p>
+              <p className="text-xs text-muted-foreground">Motor Autônomo de Previsão de Mercados Esportivos</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate("/league-profiles")} className="gap-1.5">
-              <Trophy className="w-4 h-4" /> Perfis de Liga
-            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/export")} className="gap-1.5">
               <Download className="w-4 h-4" /> Exportar Dados
             </Button>
@@ -80,7 +75,7 @@ export default function Home() {
           </TabsContent>
 
           <TabsContent value="results">
-            {lastMatch && <MatchResults match={lastMatch} leagueProfile={lastLeagueProfile} />}
+            {lastMatch && <MatchResults match={lastMatch} />}
           </TabsContent>
 
           <TabsContent value="calibration">
