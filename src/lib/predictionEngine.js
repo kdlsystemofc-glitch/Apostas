@@ -210,6 +210,12 @@ function calcCorners(atk, def_, isHome = false) {
       indice_ofensivo: Math.round(io * 10000) / 10000,
       indice_defensivo: Math.round(id_ * 10000) / 10000,
       indice_composto: Math.round(ic * 10000) / 10000,
+      detalhes_of: Object.fromEntries(
+        Object.entries(ofensivos).map(([k, [p, v]]) => [k, [p, Math.round(v * 1000) / 1000]])
+      ),
+      detalhes_def: Object.fromEntries(
+        Object.entries(defensivos).map(([k, [p, v]]) => [k, [p, Math.round(v * 1000) / 1000]])
+      ),
     },
   };
 }
@@ -399,11 +405,12 @@ function calcResultado(xgCasa, xgFora) {
   }
 
   function dixonColesTau(x, y, lambda1, lambda2, rho = -0.13) {
-    if (x === 0 && y === 0) return 1 - (lambda1 * lambda2 * rho);
-    if (x === 1 && y === 0) return 1 + (lambda1 * rho);
-    if (x === 0 && y === 1) return 1 + (lambda2 * rho);
-    if (x === 1 && y === 1) return 1 - rho;
-    return 1.0;
+    let tau = 1.0;
+    if (x === 0 && y === 0) tau = 1 - (lambda1 * lambda2 * rho);
+    else if (x === 1 && y === 0) tau = 1 + (lambda1 * rho);
+    else if (x === 0 && y === 1) tau = 1 + (lambda2 * rho);
+    else if (x === 1 && y === 1) tau = 1 - rho;
+    return Math.max(0, tau);
   }
 
   for (let i = 0; i <= maxGols; i++) {

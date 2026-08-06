@@ -30,7 +30,11 @@ function calcBloco(matches) {
     const dados = matches
       .map(m => ({ p: prev(m), r: real(m) }))
       .filter(d => d.p !== null && d.p !== undefined && d.r !== null && d.r !== undefined);
-    
+
+    if (dados.length === 0) {
+      return { key, n: 0, status: "insuficiente" };
+    }
+
     const mediaPrev = dados.reduce((s, d) => s + d.p, 0) / dados.length;
     const mediaReal = dados.reduce((s, d) => s + d.r, 0) / dados.length;
     const vies = mediaPrev - mediaReal;
@@ -57,6 +61,7 @@ function calcBloco(matches) {
     return {
       key,
       n: dados.length,
+      status: "ok",
       mediaPrev: mediaPrev.toFixed(2),
       mediaReal: mediaReal.toFixed(2),
       vies: vies.toFixed(2),
