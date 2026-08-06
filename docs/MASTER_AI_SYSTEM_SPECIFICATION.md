@@ -1,13 +1,28 @@
 # ESPECIFICAÇÃO TÉCNICA MESTRE E GUIA COMPLETO PARA INTELIGÊNCIA ARTIFICIAL
 ## MASTER AI SPECIFICATION & HANDOVER GUIDE FOR SPORTS PREDICTOR V2
 
-> **AVISO IMPORTANTE PARA OUTRAS IAs / DESENVOLVEDORES:** Este é o **documento definitivo e unificado** sobre o sistema **Sports Predictor V2**. Ele reúne toda a engenharia reversa, matemática estatística, dicionário completo de estatísticas do StatsHub, cruzamento de parâmetros ofensivos/defensivos, Binomial Negativa (NB2), Ambas Marcam Bivariado, Handicaps Asiáticos, Gestão Quarter-Kelly, Clean Architecture (5 camadas), Zustand Stores, Supabase Repository Pattern, Code-Splitting (< 470 kB) e arquitetura de calibração. NENHUMA informação foi omitida.
+> **AVISO IMPORTANTE PARA OUTRAS IAs / DESENVOLVEDORES:** Este é o **documento definitivo e unificado** sobre o sistema **Sports Predictor V2**. Ele reúne toda a engenharia reversa, matemática estatística, dicionário completo de estatísticas do StatsHub, cruzamento de parâmetros ofensivos/defensivos, Binomial Negativa (NB2), Ambas Marcam Bivariado, Handicaps Asiáticos, Gestão Quarter-Kelly em R$, Clean Architecture (5 camadas), Zustand Stores, Supabase Repository Pattern, Design System Dark Glassmorphism, 1-Second Glance Decision Card e conformidade com acessibilidade WCAG 2.1 AA. NENHUMA informação foi omitida.
 
 ---
 
-## 1. VISÃO GERAL DA ARQUITETURA DE 5 CAMADAS (CLEAN ARCHITECTURE)
+## 1. DESIGN SYSTEM & INTERFACE PREMIUM (DARK GLASSMORPHISM)
 
-O **Sports Predictor V2** é estruturado em uma **Clean Architecture** totalmente desacoplada de 5 camadas:
+O **Sports Predictor V2** utiliza uma estética visual de nível profissional inspirada em terminais quantitativos de alta frequência:
+
+- **Fundo / Canvas:** `#090d16` (Slate 950 Deep).
+- **Cards e Superfícies:** `#131b2e` (Slate 900 Glass com `backdrop-blur-md` e borda `#1e293b`).
+- **Hero Decision Card ("Pick Principal do Modelo"):**
+  - Implementa o **1-Second Glance Test**: em menos de 1 segundo o usuário visualiza:
+    - 🎯 Aposta Recomendada (1X2)
+    - 📈 Confiança %
+    - 💎 Odd Justa ($1/P$)
+    - 🔥 EV+ Real (%)
+    - 💰 **Stake Sugerida em Reais (R$)** via Quarter-Kelly.
+- **`BankrollWidget.jsx`:** Permite configurar a Banca Total em R$ e a fração de Kelly diretamente no Header.
+
+---
+
+## 2. ARQUITETURA DE 5 CAMADAS (CLEAN ARCHITECTURE)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -39,7 +54,7 @@ O **Sports Predictor V2** é estruturado em uma **Clean Architecture** totalment
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 5. PRESENTATION LAYER (src/components/ & src/pages/)                        │
-│ • UI Primitives (Radix UI / Shadcn) + Feature Components.                   │
+│ • BankrollWidget, MatchResultBlock, MarketBlock com Dark Glassmorphism.    │
 │ • Code-Splitting com React.lazy() no App.jsx (Bundle inicial < 470 kB).      │
 │ • ErrorBoundary global de resiliência visual.                               │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -47,7 +62,7 @@ O **Sports Predictor V2** é estruturado em uma **Clean Architecture** totalment
 
 ---
 
-## 2. PARSER E DICIONÁRIO COMPLETO DAS ESTATÍSTICAS DO STATSHUB
+## 3. PARSER E DICIONÁRIO COMPLETO DAS ESTATÍSTICAS DO STATSHUB
 
 O parser `parseStatsHubText(text)` lê a tabela de estatísticas colada e extrai os valores numéricos. Cada estatística no StatsHub traz duas colunas essenciais:
 - **`t` (Team / Feito):** Média por jogo produzida pelo próprio time.
@@ -74,9 +89,9 @@ O parser `parseStatsHubText(text)` lê a tabela de estatísticas colada e extrai
 
 ---
 
-## 3. O CRUZAMENTO MATEMÁTICO E MOTOR V2
+## 4. O CRUZAMENTO MATEMÁTICO E MOTOR V2
 
-### 3.1 Primitivas Matemáticas V2
+### 4.1 Primitivas Matemáticas V2
 
 1. **Bayesian Shrinkage (`bayesianShrinkage`):**
    $$\lambda_{\text{bayes}} = \left(\frac{n}{n + 10}\right) \lambda_{\text{obs}} + \left(1 - \frac{n}{n + 10}\right) \mu_{\text{liga}}$$
@@ -95,27 +110,6 @@ O parser `parseStatsHubText(text)` lê a tabela de estatísticas colada e extrai
 
 6. **Gestão de Risco Quarter-Kelly (`calcularQuarterKelly`):**
    $$f^* = \max\left(0, \, 0.25 \times \frac{P \cdot \text{Odd}_{\text{casa}} - 1}{\text{Odd}_{\text{casa}} - 1}\right)$$
-
----
-
-### 3.2 Ambas Marcam (BTTS) Bivariado & Handicaps Asiáticos
-
-- **BTTS Bivariado Integrado:**
-  $$P(\text{BTTS Sim}) = \sum_{i \ge 1} \sum_{j \ge 1} P(i, j) = 1 - \sum_{i=0}^8 P(i, 0) - \sum_{j=0}^8 P(0, j) + P(0, 0)$$
-
-- **Draw No Bet (DNB / AH 0.0):**
-  $$P(\text{DNB Mandante}) = \frac{P_{\text{casa}}}{P_{\text{casa}} + P_{\text{fora}}}, \quad P(\text{DNB Visitante}) = \frac{P_{\text{fora}}}{P_{\text{casa}} + P_{\text{fora}}}$$
-
-- **Handicap Asiático Mandante -1.5:**
-  $$P(\text{AH -1.5}) = \sum_{i - j \ge 2} P(i, j)$$
-
----
-
-## 4. GERENCIAMENTO DE ESTADO E REPOSITÓRIOS
-
-- **`useMatchStore.js`:** Gerencia estado global de partidas e seleção ativas.
-- **`useBankrollStore.js`:** Armazena a banca total em R$ (ex: R$ 1.000,00) e calcula o valor da stake recomendada em dinheiro real.
-- **`MatchRepository.js`:** Abstração completa de consultas REST ao Supabase.
 
 ---
 

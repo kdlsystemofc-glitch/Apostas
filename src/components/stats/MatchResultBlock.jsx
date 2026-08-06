@@ -1,8 +1,12 @@
 import React, { useState } from "react";
 import { calcularQuarterKelly } from "@/lib/predictionEngine";
+import { useBankrollStore } from "@/store/useBankrollStore";
+import { Trophy, TrendingUp, DollarSign, ShieldAlert } from "lucide-react";
 
 export default function MatchResultBlock({ match }) {
   const [bookieOdd, setBookieOdd] = useState("");
+  const { totalBankroll, calculateStakeAmount } = useBankrollStore();
+
   const r = match.results;
   if (!r?.p_casa_vence) return null;
 
@@ -27,42 +31,45 @@ export default function MatchResultBlock({ match }) {
   const kelly = calcularQuarterKelly(pick.prob, bookieOdd);
   const oddNum = parseFloat(bookieOdd);
   const hasBookieOdd = !isNaN(oddNum) && oddNum > 1.0;
+  const stakeReais = hasBookieOdd && kelly.isEVPlus ? calculateStakeAmount(kelly.stakePct) : 0;
 
   return (
-    <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-      <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
-        <h3 className="font-semibold flex items-center gap-2 text-base">
-          🏆 Resultado Esperado (1X2)
+    <div className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md overflow-hidden shadow-xl">
+      {/* Header do Card */}
+      <div className="px-5 py-3.5 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800">
+        <h3 className="font-semibold flex items-center gap-2 text-base text-slate-100">
+          <Trophy className="w-4 h-4 text-emerald-400" /> Resultado Esperado (1X2)
         </h3>
-        <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-full font-medium">
-          Dixon-Coles V2 Model
+        <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full font-bold">
+          Modelo Dixon-Coles V2
         </span>
       </div>
 
       <div className="p-5 space-y-5">
-        {/* Box da Pick do Modelo (Assumindo a Responsabilidade) */}
-        <div className="rounded-xl border-2 border-emerald-500/30 bg-emerald-50/50 p-4 dark:bg-emerald-950/20 dark:border-emerald-500/40">
+        {/* HERO DECISION CARD (Teste do Olhar de 1 Segundo) */}
+        <div className="rounded-xl border-2 border-emerald-500/40 bg-emerald-950/20 p-4 relative overflow-hidden">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-              🎯 Pick Principal do Modelo
+            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              🔥 Pick Principal do Modelo (1-Second Decision)
             </span>
-            <span className="text-xs font-bold bg-emerald-600 text-white px-2 py-0.5 rounded">
+            <span className="text-xs font-black bg-emerald-600 text-white px-2.5 py-0.5 rounded shadow-sm">
               {(pick.prob * 100).toFixed(1)}% Confiança
             </span>
           </div>
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-1">
-            <p className="text-xl font-black text-slate-900 dark:text-white">
+            <p className="text-2xl font-black text-white tracking-tight">
               {pickTitle}
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border shadow-sm">
-                Odd Justa (Fair Odd): <span className="text-emerald-600 font-extrabold">{pick.odd_minima}</span>
+              <div className="text-xs font-bold text-slate-200 bg-slate-800/90 px-3 py-1.5 rounded-lg border border-slate-700 shadow-sm tabular-nums">
+                Odd Justa: <span className="text-emerald-400 font-extrabold">{pick.odd_minima}</span>
               </div>
               {hasBookieOdd && (
-                <div className={`text-xs font-extrabold px-3 py-1.5 rounded-lg border ${
+                <div className={`text-xs font-extrabold px-3 py-1.5 rounded-lg border tabular-nums ${
                   kelly.isEVPlus
-                    ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
-                    : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950 dark:text-rose-200"
+                    ? "bg-emerald-600 text-white border-emerald-500 shadow-sm"
+                    : "bg-rose-950/80 text-rose-300 border-rose-800"
                 }`}>
                   {kelly.isEVPlus ? `🔥 EV+ +${kelly.evPct.toFixed(1)}%` : `EV ${kelly.evPct.toFixed(1)}%`}
                 </div>
@@ -70,10 +77,10 @@ export default function MatchResultBlock({ match }) {
             </div>
           </div>
 
-          {/* Campo Opcional para Inserção da Odd da Casa e Sugestão Quarter-Kelly */}
-          <div className="mt-3.5 pt-3 border-t border-emerald-200/60 dark:border-emerald-800/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+          {/* Calculador de Odd da Casa & Stake em Reais */}
+          <div className="mt-3.5 pt-3 border-t border-emerald-500/20 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground font-medium whitespace-nowrap">Odd da Casa (Bet365 / Pinnacle):</span>
+              <span className="text-slate-300 font-semibold whitespace-nowrap">Odd da Casa (Bet365 / Pinnacle):</span>
               <input
                 type="number"
                 step="0.01"
@@ -81,18 +88,19 @@ export default function MatchResultBlock({ match }) {
                 placeholder="Ex: 2.10"
                 value={bookieOdd}
                 onChange={(e) => setBookieOdd(e.target.value)}
-                className="w-24 px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-24 px-2 py-1 rounded border border-slate-700 bg-slate-950 text-white font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             {hasBookieOdd && (
-              <div className="flex items-center gap-2">
+              <div>
                 {kelly.isEVPlus ? (
-                  <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-1 rounded border border-emerald-300">
-                    💰 Stake Recomendada (Quarter-Kelly): <strong>{kelly.stakePct}% da Banca</strong>
-                  </span>
+                  <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-300 bg-emerald-950/80 px-3 py-1.5 rounded-lg border border-emerald-500/40 shadow-sm">
+                    <DollarSign className="w-4 h-4 text-emerald-400" />
+                    <span>Stake Sugerida: <strong>{kelly.stakePct}%</strong> ({`R$ ${stakeReais.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`})</span>
+                  </div>
                 ) : (
-                  <span className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
-                    Sem Valor Esperado positivo frente à Odd informada
+                  <span className="text-xs text-rose-400 font-semibold flex items-center gap-1">
+                    <ShieldAlert className="w-3.5 h-3.5" /> Sem valor esperado frente à Odd digitada
                   </span>
                 )}
               </div>
@@ -102,24 +110,24 @@ export default function MatchResultBlock({ match }) {
 
         {/* Barra Visual de Probabilidades (1X2) */}
         <div className="space-y-2">
-          <div className="flex rounded-full overflow-hidden h-9 text-xs font-bold shadow-inner">
-            <div className="bg-emerald-500 text-white flex items-center justify-center transition-all"
+          <div className="flex rounded-full overflow-hidden h-9 text-xs font-bold shadow-inner border border-slate-800">
+            <div className="bg-emerald-600 text-white flex items-center justify-center transition-all tabular-nums"
                  style={{ width: barWidth(r.p_casa_vence) }}>
               {(r.p_casa_vence * 100).toFixed(1)}%
             </div>
-            <div className="bg-amber-500 text-white flex items-center justify-center transition-all"
+            <div className="bg-amber-600 text-white flex items-center justify-center transition-all tabular-nums"
                  style={{ width: barWidth(r.p_empate) }}>
               {(r.p_empate * 100).toFixed(1)}%
             </div>
-            <div className="bg-rose-500 text-white flex items-center justify-center transition-all"
+            <div className="bg-rose-600 text-white flex items-center justify-center transition-all tabular-nums"
                  style={{ width: barWidth(r.p_fora_vence) }}>
               {(r.p_fora_vence * 100).toFixed(1)}%
             </div>
           </div>
-          <div className="flex justify-between text-xs font-semibold px-1">
-            <span className="text-emerald-700 dark:text-emerald-400">Mandante: {home}</span>
-            <span className="text-amber-700 dark:text-amber-400">Empate</span>
-            <span className="text-rose-700 dark:text-rose-400">Visitante: {away}</span>
+          <div className="flex justify-between text-xs font-bold px-1">
+            <span className="text-emerald-400">Mandante: {home}</span>
+            <span className="text-amber-400">Empate</span>
+            <span className="text-rose-400">Visitante: {away}</span>
           </div>
         </div>
 
@@ -127,26 +135,26 @@ export default function MatchResultBlock({ match }) {
         <div className="grid sm:grid-cols-2 gap-4 pt-1">
           {/* Handicaps Derivados */}
           {r.handicaps && (
-            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 p-3 border">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-                Handicaps Asiáticos Derivados
+            <div className="rounded-xl bg-slate-950/60 p-3.5 border border-slate-800">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-blue-400" /> Handicaps Asiáticos Derivados
               </p>
-              <div className="space-y-1.5 text-xs font-medium">
-                <div className="flex justify-between">
+              <div className="space-y-2 text-xs font-semibold text-slate-300 tabular-nums">
+                <div className="flex justify-between border-b border-slate-800/60 pb-1">
                   <span>DNB (AH 0.0) {home}:</span>
-                  <strong className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  <strong className="text-emerald-400">
                     {(r.handicaps.dnb_home * 100).toFixed(1)}% (Odd {(1 / r.handicaps.dnb_home).toFixed(2)})
                   </strong>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between border-b border-slate-800/60 pb-1">
                   <span>DNB (AH 0.0) {away}:</span>
-                  <strong className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  <strong className="text-emerald-400">
                     {(r.handicaps.dnb_away * 100).toFixed(1)}% (Odd {(1 / r.handicaps.dnb_away).toFixed(2)})
                   </strong>
                 </div>
                 <div className="flex justify-between">
                   <span>AH -1.5 {home}:</span>
-                  <strong className="text-slate-900 dark:text-slate-100 font-bold">
+                  <strong className="text-white">
                     {(r.handicaps.ah_minus_15_home * 100).toFixed(1)}%
                   </strong>
                 </div>
@@ -156,14 +164,14 @@ export default function MatchResultBlock({ match }) {
 
           {/* Placares Mais Prováveis */}
           <div>
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">
               Top 5 Placares Mais Prováveis
             </p>
             <div className="grid grid-cols-5 gap-1.5">
               {r.placares_top5?.map((p, i) => (
-                <div key={i} className="rounded-lg bg-slate-100 dark:bg-slate-800 p-1.5 text-center border">
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">{p.placar}</p>
-                  <p className="text-[11px] text-muted-foreground font-medium">{(p.prob * 100).toFixed(1)}%</p>
+                <div key={i} className="rounded-lg bg-slate-950/80 p-2 text-center border border-slate-800">
+                  <p className="text-sm font-extrabold text-white">{p.placar}</p>
+                  <p className="text-[11px] text-slate-400 font-bold tabular-nums">{(p.prob * 100).toFixed(1)}%</p>
                 </div>
               ))}
             </div>
