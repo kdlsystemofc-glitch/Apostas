@@ -1,15 +1,15 @@
 # ESPECIFICAÇÃO TÉCNICA MESTRE E GUIA COMPLETO PARA INTELIGÊNCIA ARTIFICIAL
-## MASTER AI SPECIFICATION & HANDOVER GUIDE FOR SPORTS PREDICTOR SYSTEM
+## MASTER AI SPECIFICATION & HANDOVER GUIDE FOR SPORTS PREDICTOR V2
 
-> **AVISO IMPORTANTE PARA OUTRAS IAs / DESENVOLVEDORES:** Este é o **documento definitivo e unificado** sobre o sistema **Sports Predictor**. Ele reúne toda a engenharia reversa, matemática estatística, dicionário completo de estatísticas do StatsHub, cruzamento de parâmetros ofensivos/defensivos, componentes visuais de UI/UX, linhas comerciais da Bet365/Pinnacle, regras de decisão estrita do 1X2 e arquitetura de calibração. NENHUMA informação foi omitida.
+> **AVISO IMPORTANTE PARA OUTRAS IAs / DESENVOLVEDORES:** Este é o **documento definitivo e unificado** sobre o sistema **Sports Predictor V2**. Ele reúne toda a engenharia reversa, matemática estatística, dicionário completo de estatísticas do StatsHub, cruzamento de parâmetros ofensivos/defensivos, Binomial Negativa (NB2), Ambas Marcam Bivariado, Handicaps Asiáticos, Gestão Quarter-Kelly, componentes visuais de UI/UX, linhas comerciais e arquitetura de calibração. NENHUMA informação foi omitida.
 
 ---
 
 ## 1. VISÃO GERAL DA ARQUITETURA E FLUXO DE DADOS
 
-O **Sports Predictor** é um motor estatístico autônomo e sistema web desenvolvido em React 18, Vite e Tailwind CSS, integrado a um banco de dados PostgreSQL no Supabase.
+O **Sports Predictor V2** é um motor estatístico autônomo e sistema web desenvolvido em React 18, Vite e Tailwind CSS, integrado a um banco de dados PostgreSQL no Supabase.
 
-### Fluxograma Geral do Pipeline de Dados:
+### Fluxograma Geral do Pipeline de Dados V2:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -23,35 +23,34 @@ O **Sports Predictor** é um motor estatístico autônomo e sistema web desenvol
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 2. MOTOR ESTATÍSTICO AUTÔNOMO (predictionEngine.js)                         │
-│ • Execução de analisarJogo(statsCasa, statsFora).                           │
+│ 2. MOTOR ESTATÍSTICO V2 (predictionEngine.js)                               │
+│ • Bayesian Shrinkage Layer: bayesianShrinkage(val, mediaLiga, k=10, n=5).   │
 │ • Cálculo das Âncoras Base: ancora(faz, cede) = (faz + cede) / 2.            │
-│ • Cruzamento Ofensivo vs Defensivo:                                         │
+│ • Cruzamento Ofensivo vs Defensivo (GLM Indexing):                          │
 │   - Ataque: indice(feito, cedido) = feito / ((feito + cedido)/2).           │
 │   - Defesa: resistencia(cedidoDef, feitoAtk) = ln(1+cedidoDef)/ln(1+feitoAtk)│
-│ • Ponderação Dinâmica: pesosDinamicos(componentes) se faltar algum stat.    │
-│ • Obtenção dos Lambdas (Expectativas de Gols, Escanteios, Cartões, etc.).   │
+│ • Obtenção dos Lambdas (Expectativas de Gols, Escanteios, Cartões, Faltas). │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 3. MODELAGEM DE PROBABILIDADES E MERCADOS COMERCIAIS                        │
-│ • Mercado 1X2 Bivariado com Ajuste Dixon-Coles tau(x, y, rho = -0.13).      │
-│   └─ Emissão da PICK ESTRITA: Vitória Casa, Empate ou Vitória Fora.         │
-│ • Distribuição de Poisson CDF: poissonOver(media, linha).                    │
-│ • Filtro de Linhas Comerciais Reais: COMMERCIAL_LINES.                      │
-│ • Cálculo de Odd Justa (Fair Odd) e Calculador de EV Real (+X.X%).          │
+│ 3. MODELAGEM DE PROBABILIDADES E DISTRIBUIÇÕES V2                           │
+│ • Poisson CDF (Gols, Escanteios, Chutes).                                   │
+│ • Binomial Negativa NB2 (Cartões, Faltas) -> Corrige Sobredispersão.        │
+│ • Matriz 8x8 Dixon-Coles Bivariada (1X2, BTTS Bivariado e Placares).        │
+│ • Integrador de Handicaps Asiáticos (AH -0.5, AH -1.5) e DNB (AH 0.0).      │
+│ • Gestão de Risco Quarter-Kelly: calcularQuarterKelly(prob, oddCasa).       │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 4. CAMADA VISUAL E DASHBOARDS DE INTERFACE (React Components)               │
-│ • MatchResultBlock.jsx -> Pick 1X2 + Odd Justa + Calculador de EV+ Real.    │
-│ • MarketBlock.jsx      -> Highlight da Linha Base + Odd Justa + EV+ Real.   │
-│ • BestBetsByMarket.jsx -> Ranking de Melhores Apostas por Força de Sinal.   │
+│ • MatchResultBlock.jsx -> Pick 1X2 + Odd Justa + EV+ Real + Stake Kelly.    │
+│ • MarketBlock.jsx      -> Highlight Linha Base + Odd Justa + Stake Kelly.   │
+│ • BestBetsByMarket.jsx -> Ranking de Apostas + Handicaps Asiáticos.         │
 │ • CornerDetails.jsx    -> Tabela de Sub-Fatores Ofensivos/Defensivos.       │
 │ • DailyOverview.jsx    -> Painel Diário de Jogos e Melhores Entradas.        │
-│ • ErrorBoundary.jsx    -> Captura de Exceções de UI (Prevenção Tela Branca).│
+│ • ErrorBoundary.jsx    -> Captura de Exceções (Prevenção Tela Branca).      │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
                                        ▼
@@ -68,75 +67,68 @@ O **Sports Predictor** é um motor estatístico autônomo e sistema web desenvol
 ## 2. PARSER E DICIONÁRIO COMPLETO DAS ESTATÍSTICAS DO STATSHUB
 
 O parser `parseStatsHubText(text)` lê a tabela de estatísticas colada e extrai os valores numéricos. Cada estatística no StatsHub traz duas colunas essenciais:
-- **`t` (Team / Feito):** Média por jogo produzida pelo próprio time (ex: chutes no gol que o time faz).
-- **`c` (Conceded / Cedido):** Média por jogo concedida pelo time ao adversário (ex: chutes no gol que o time sofre).
+- **`t` (Team / Feito):** Média por jogo produzida pelo próprio time.
+- **`c` (Conceded / Cedido):** Média por jogo concedida pelo time ao adversário.
 
 ### Tabela Mestra de Mapeamento (`STAT_MAP`):
 
-| Nome Original no StatsHub | Chave Interna no Código | Descrição Estatística | Função no Cruzamento de Mercado |
-| :--- | :--- | :--- | :--- |
-| **Goals** | `goals` | Gols marcados (`t`) e sofridos (`c`) | Base do cálculo de expectativa de gols ($xG$). |
-| **Corners** | `corners` | Escanteios a favor (`t`) e cedidos (`c`) | Base do cálculo de escanteios ($xC$). |
-| **Cards** | `cards` | Total de cartões recebidos (`t`) e forçados (`c`) | Base do cálculo de cartões ($xCard$). |
-| **Yellow Cards** | `yellow_cards` | Cartões amarelos recebidos (`t`) e sofridos (`c`) | Fator dominante (35%) no cálculo de cartões. |
-| **Red Cards** | `red_cards` | Cartões vermelhos recebidos e sofridos | Métrica de indisciplina histórica complementar. |
-| **Expected Goals (xG)** | `xg` | Gols esperados gerados (`t`) e cedidos (`c`) | Fator dominante (25%) na expectativa de gols. |
-| **Shots On Target** | `shots_on_target` | Chutes no gol a favor (`t`) e sofridos (`c`) | Fator decisivo em Gols, Cantos, Chutes no Gol e Defesas. |
-| **Shots In The Box** | `shots_in_box` | Chutes realizados dentro da grande área | Indicador de presença na área e volume de perigo. |
-| **Total Shots** | `total_shots` | Total de chutes (no gol + fora + bloqueados) | Medida de volume ofensivo geral da equipe. |
-| **Shots Outside The Box**| `shots_outside_box` | Chutes de fora da área | Indicador de média e longa distância. |
-| **Big Chance Scored** | `big_chance_scored` | Grandes chances convertidas em gol | Eficiência de finalização do ataque. |
-| **Big Chance Missed** | `big_chance_missed` | Grandes chances desperdiçadas | Geração de escanteios via rebate / defesa do goleiro. |
-| **Big Chance Created** | `big_chance_created` | Grandes chances criadas pela equipe | Capacidade de armação e penetração ofensiva. |
-| **Touches In Opp Box** | `touches_opp_box` | Toques na bola dentro da área adversária | Pressão ofensiva e volume de escanteios/gols. |
-| **Crosses** | `crosses` | Cruzamentos efetuados para a área | Fator relevante (20%) na geração de escanteios. |
-| **Possession** | `possession` | Porcentagem de posse de bola ($\%$) | Indicador de controle de jogo e domínio territorial. |
-| **Clearances** | `clearances` | Cortes defensivos e rebatidas | Fator defensivo (40%) de resistência a escanteios/gols. |
-| **Goalkeeper Saves** | `gk_saves` | Defesas efetuadas pelo goleiro | Média de intervenções do goleiro sob pressão. |
-| **Fouls** | `fouls` | Faltas cometidas (`t`) e sofridas (`c`) | Fator dominante (40%) no mercado de faltas e cartões. |
-| **Tackles** | `tackles` | Desarmes efetuados pela equipe | Fator de combate físico e paradas de jogada (faltas/cartões). |
-| **Interception Won** | `interceptions` | Interceptações de passe bem-sucedidas | Fator de leitura defensiva e interrupção de ataque. |
-| **Dispossessed** | `dispossessed` | Perdas de posse de bola sob pressão | Fator de vulnerabilidade e concessão de faltas. |
-| **Offsides** | `offsides` | Impedimentos cometidos pela equipe | Indicador de linha de zaga adiantada e profundidade. |
-| **Passes** | `passes` | Total de passes trocados | Volume de construção de jogo. |
-| **Free Kicks** | `free_kicks` | Faltas cobradas / Tiros livres | Oportunidades de bola parada ofensiva. |
-| **Throw Ins** | `throw_ins` | Arremessos laterais | Volume de jogo pelas pontas. |
-| **Goal Kicks** | `goal_kicks` | Tiros de meta cobrados | Pressão sofrida ou bolas chutadas para fora. |
-| **Errors Lead To Goal** | `errors_goal` | Erros graves que resultaram em gol | Falhas individuais e fragilidade defensiva. |
-| **Errors Lead To Shot** | `errors_shot` | Erros graves que resultaram em chute | Concessão de finalizações ao adversário. |
+| Nome Original no StatsHub | Chave Interna | Função no Cruzamento V2 |
+| :--- | :--- | :--- |
+| **Goals** | `goals` | Base da expectativa de gols ($xG$). |
+| **Corners** | `corners` | Base do cálculo de escanteios ($xC$). |
+| **Cards** | `cards` | Base de cartões via Binomial Negativa (NB2). |
+| **Yellow Cards** | `yellow_cards` | Fator dominante (35%) em cartões. |
+| **Red Cards** | `red_cards` | Indisciplina complementar. |
+| **Expected Goals (xG)** | `xg` | Fator dominante (25%) em gols. |
+| **Shots On Target** | `shots_on_target` | Fator decisivo em Gols, Cantos, Chutes no Gol e Defesas. |
+| **Shots In The Box** | `shots_in_box` | Indicador de presença na área. |
+| **Total Shots** | `total_shots` | Medida de volume ofensivo geral. |
+| **Clearances** | `clearances` | Fator defensivo de resistência (40%). |
+| **Goalkeeper Saves** | `gk_saves` | Defesas efetuadas pelo goleiro. |
+| **Fouls** | `fouls` | Faltas via Binomial Negativa (NB2, $r=12.0$). |
+| **Tackles** | `tackles` | Fator de combate físico. |
+| **Interception Won** | `interceptions` | Faltas táticas / cortes de passe. |
 
 ---
 
-## 3. O CRUZAMENTO MATEMÁTICO DE ESTATÍSTICAS E PARÂMETROS
+## 3. O CRUZAMENTO MATEMÁTICO E MOTOR V2
 
-### 3.1 As 4 Primitivas Matemáticas de Cruzamento
+### 3.1 Primitivas Matemáticas V2
 
-Toda previsão no sistema é construída através do cruzamento entre as estatísticas do **Time Atacante (Mandante/Visitante)** e do **Time Defensor (Visitante/Mandante)** usando 4 equações fundamentais:
+1. **Bayesian Shrinkage (`bayesianShrinkage`):**
+   $$\lambda_{\text{bayes}} = \left(\frac{n}{n + 10}\right) \lambda_{\text{obs}} + \left(1 - \frac{n}{n + 10}\right) \mu_{\text{liga}}$$
 
-#### 1. Âncora de Equilíbrio (`ancora`):
-$$A(\text{atk}, \text{def}) = \frac{\text{atk.faz} + \text{def.cede}}{2}$$
+2. **Âncora de Equilíbrio (`ancora`):**
+   $$A(\text{atk}, \text{def}) = \frac{\text{atk.faz} + \text{def.cede}}{2}$$
 
-#### 2. Índice de Intensidade Relativa (`indice`):
-$$I(f, c) = \begin{cases} \frac{f}{(f + c) / 2}, & \text{se } (f + c) > 0 \\ 1.0, & \text{caso contrário} \end{cases}$$
+3. **Índice de Intensidade Relativa (`indice`):**
+   $$I(f, c) = \frac{f}{(f + c) / 2}$$
 
-#### 3. Resistência Defensiva Logarítmica (`resistencia`):
-$$R(\text{cedidoDef}, \text{feitoAtk}) = \begin{cases} 1.0, & \text{se feitoAtk} \le 0 \\ \min\left(\frac{\ln(1 + \text{cedidoDef})}{\ln(1 + \text{feitoAtk})}, 2.0\right), & \text{caso contrário} \end{cases}$$
+4. **Resistência Defensiva Logarítmica (`resistencia`):**
+   $$R(\text{cedidoDef}, \text{feitoAtk}) = \min\left(\frac{\ln(1 + \text{cedidoDef})}{\ln(1 + \text{feitoAtk})}, 2.0\right)$$
 
-#### 4. Re-normalização Dinâmica de Pesos (`pesosDinamicos`):
-$$w'_i = \frac{w_i}{\sum_{k \in \text{Válidos}} w_k} \implies I_{\text{composto}} = \sum w'_i \cdot v_i$$
+5. **Distribuição Binomial Negativa (`negativeBinomialOver`):**
+   $$P(Y = k) = \exp\left(\ln\Gamma(k + r) - \ln\Gamma(r) - \ln(k!) + r \ln p + k \ln(1 - p)\right), \quad p = \frac{r}{r + \lambda}$$
 
----
-
-### 3.2 Cruzamento Detalhado Mercado por Mercado
-
-#### ⚽ GOLS | 🔲 ESCANTEIOS | 🎯 CHUTES NO GOL | 🟨 CARTÕES | 🤜 FALTAS | 🧤 DEFESAS | 💥 CHUTES TOTAIS | 🔁 BTTS | 🏆 1X2 DIXON-COLES
-
-- **Odd Justa (Fair Odd):** $\text{OddJusta} = \max\left(1.01, \text{round}\left(\frac{1}{P}, 2\right)\right)$
-- **Calculador de EV Real:** $EV(\%) = ((P \cdot \text{Odd}_{\text{casa}}) - 1) \times 100$
+6. **Gestão de Risco Quarter-Kelly (`calcularQuarterKelly`):**
+   $$f^* = \max\left(0, \, 0.25 \times \frac{P \cdot \text{Odd}_{\text{casa}} - 1}{\text{Odd}_{\text{casa}} - 1}\right)$$
 
 ---
 
-## 4. LINHAS COMERCIAIS REAIS DE CASAS DE APOSTAS (`COMMERCIAL_LINES`)
+### 3.2 Ambas Marcam (BTTS) Bivariado & Handicaps Asiáticos
+
+- **BTTS Bivariado Integrado:**
+  $$P(\text{BTTS Sim}) = \sum_{i \ge 1} \sum_{j \ge 1} P(i, j) = 1 - \sum_{i=0}^8 P(i, 0) - \sum_{j=0}^8 P(0, j) + P(0, 0)$$
+
+- **Draw No Bet (DNB / AH 0.0):**
+  $$P(\text{DNB Mandante}) = \frac{P_{\text{casa}}}{P_{\text{casa}} + P_{\text{fora}}}, \quad P(\text{DNB Visitante}) = \frac{P_{\text{fora}}}{P_{\text{casa}} + P_{\text{fora}}}$$
+
+- **Handicap Asiático Mandante -1.5:**
+  $$P(\text{AH -1.5}) = \sum_{i - j \ge 2} P(i, j)$$
+
+---
+
+## 4. LINHAS COMERCIAIS REAIS (`COMMERCIAL_LINES`)
 
 ```javascript
 export const COMMERCIAL_LINES = {
@@ -159,37 +151,18 @@ export const COMMERCIAL_LINES = {
 
 ---
 
-## 5. REGRAS DE DESIGN DE UI/UX, EV+ REAL E RESILIÊNCIA
+## 5. DESIGN DE INTERFACE V2 E GESTÃO DE RISCO
 
-1. **Card "Pick Principal do Modelo" (`MatchResultBlock.jsx`):** Exibe no topo a entrada recomendada do 1X2 (ex: **Vitória Argentina**), a **Odd Justa (Fair Odd)** ($1/P$) e um **Calculador de EV Real**, permitindo digitar a Odd da casa de apostas e calculando $EV(\%) = ((P \cdot \text{Odd}) - 1) \cdot 100$, destacando o badge `🔥 EV+ +X.X%` quando $EV > 0\%$.
-2. **Card de Mercado (`MarketBlock.jsx`):** Exibe a **Linha Comercial Recomendada**, a **Odd Justa**, um campo para inserção da Odd da casa com calculador de EV+ Real e a tabela de linhas comerciais reais.
-3. **Melhor Aposta por Mercado (`BestBetsByMarket.jsx`):** Ordena os mercados pelo desvio $|P - 0.50|$ para ranquear onde estão os melhores valores da partida (Odd Justa).
-4. **Detalhamento de Escanteios (`CornerDetails.jsx`):** Exibe a tabela completa de fatores ofensivos e defensivos com os pesos e os valores parciais de cada time.
-5. **Resiliência de Interface (`ErrorBoundary.jsx`):** Envolve a estrutura de rotas para capturar erros de renderização, prevenindo tela branca e exibindo interface de recuperação.
-6. **Bateria de Testes de Não-Regressão (Vitest):** Testes unitários automatizados em `src/lib/predictionEngine.test.js` cobrem 100% das primitivas estatísticas, garantindo zero regressão matemática.
+1. **`MatchResultBlock.jsx`:** Exibe a Pick 1X2, a Odd Justa ($1/P$), o calculador de EV+ Real, os Handicaps Asiáticos (DNB, AH -1.5) e a **Stake Recomendada em % da Banca via Quarter-Kelly**.
+2. **`MarketBlock.jsx`:** Exibe a Linha Comercial Recomendada, a Odd Justa, o campo de Odd da Casa e a sugestão de Stake Quarter-Kelly por mercado.
+3. **`ErrorBoundary.jsx`:** Garante captura elegante de erros de renderização.
+4. **`predictionEngine.test.js`:** Suíte Vitest com 14 testes unitários automatizados.
 
 ---
 
-## 6. SISTEMA DE CALIBRAÇÃO E DIAGNÓSTICO (`CalibrationView.jsx`)
+## 6. BANCO DE DADOS SUPABASE & RLS
 
-- **Viés ($\text{Viés}$):** $\bar{P}_{\text{previsto}} - \bar{R}_{\text{real}}$.
-- **MAE (Erro Absoluto Médio):** $\frac{1}{N}\sum |P_i - R_i|$.
-- **WinRate %:** Taxa de acerto das linhas principais recomendadas.
+- Tabela `matches` protegida por **Row Level Security (RLS)** via `supabase/schema.sql`.
 
 ---
-
-## 7. ESQUEMA DO BANCO DE DADOS (SUPABASE POSTGRESQL & RLS)
-
-### Tabela `matches`:
-- `id` (uuid, PK)
-- `home_team`, `away_team`, `date` (text)
-- `status` (`"pending"` | `"completed"`)
-- `home_stats`, `away_stats` (jsonb, dados brutos do StatsHub)
-- `results` (jsonb, projeções, probabilidades, `pick_1x2`)
-- `real_results` (jsonb, placares e dados reais salvos pós-jogo para calibração)
-
-### Segurança RLS (Row Level Security):
-- Habilitada via `ALTER TABLE matches ENABLE ROW LEVEL SECURITY;` com políticas públicas ativas.
-
----
-Este documento consolida 100% das especificações técnicas, matemáticas e operacionais do **Sports Predictor**, servindo como fonte única da verdade para qualquer Agente de IA.
+Este documento consolida 100% da arquitetura V2 do **Sports Predictor**, servindo como fonte única da verdade para Agentes de IA e Desenvolvedores.

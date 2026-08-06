@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { calcularQuarterKelly } from "@/lib/predictionEngine";
 
 export default function MatchResultBlock({ match }) {
   const [bookieOdd, setBookieOdd] = useState("");
@@ -22,10 +23,10 @@ export default function MatchResultBlock({ match }) {
 
   const pickTitle = pick.resultado === "Vitória Casa" ? `Vitória ${home}` : pick.resultado === "Vitória Fora" ? `Vitória ${away}` : pick.resultado;
 
-  // Cálculo do Expected Value (EV+) Real quando o usuário informa a Odd da Casa de Apostas
+  // Gestão de Risco e Stake via Quarter-Kelly
+  const kelly = calcularQuarterKelly(pick.prob, bookieOdd);
   const oddNum = parseFloat(bookieOdd);
   const hasBookieOdd = !isNaN(oddNum) && oddNum > 1.0;
-  const realEV = hasBookieOdd ? ((pick.prob * oddNum) - 1) * 100 : null;
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
@@ -34,7 +35,7 @@ export default function MatchResultBlock({ match }) {
           🏆 Resultado Esperado (1X2)
         </h3>
         <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-full font-medium">
-          Dixon-Coles Model
+          Dixon-Coles V2 Model
         </span>
       </div>
 
@@ -57,34 +58,44 @@ export default function MatchResultBlock({ match }) {
               <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border shadow-sm">
                 Odd Justa (Fair Odd): <span className="text-emerald-600 font-extrabold">{pick.odd_minima}</span>
               </div>
-              {hasBookieOdd && realEV !== null && (
+              {hasBookieOdd && (
                 <div className={`text-xs font-extrabold px-3 py-1.5 rounded-lg border ${
-                  realEV > 0
+                  kelly.isEVPlus
                     ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
                     : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950 dark:text-rose-200"
                 }`}>
-                  {realEV > 0 ? `🔥 EV+ +${realEV.toFixed(1)}%` : `EV ${realEV.toFixed(1)}%`}
+                  {kelly.isEVPlus ? `🔥 EV+ +${kelly.evPct.toFixed(1)}%` : `EV ${kelly.evPct.toFixed(1)}%`}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Campo Opcional para Inserção da Odd da Casa (Calculador EV+ Real) */}
-          <div className="mt-3.5 pt-3 border-t border-emerald-200/60 dark:border-emerald-800/60 flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground font-medium whitespace-nowrap">Odd da Casa (Bet365 / Pinnacle):</span>
-            <input
-              type="number"
-              step="0.01"
-              min="1.01"
-              placeholder="Ex: 2.10"
-              value={bookieOdd}
-              onChange={(e) => setBookieOdd(e.target.value)}
-              className="w-24 px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+          {/* Campo Opcional para Inserção da Odd da Casa e Sugestão Quarter-Kelly */}
+          <div className="mt-3.5 pt-3 border-t border-emerald-200/60 dark:border-emerald-800/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground font-medium whitespace-nowrap">Odd da Casa (Bet365 / Pinnacle):</span>
+              <input
+                type="number"
+                step="0.01"
+                min="1.01"
+                placeholder="Ex: 2.10"
+                value={bookieOdd}
+                onChange={(e) => setBookieOdd(e.target.value)}
+                className="w-24 px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
             {hasBookieOdd && (
-              <span className="text-[11px] text-muted-foreground ml-1">
-                {realEV > 0 ? "✓ Aposta de Valor Esperado Positivo!" : "✗ Sem Valor Esperado frente à Odd informada"}
-              </span>
+              <div className="flex items-center gap-2">
+                {kelly.isEVPlus ? (
+                  <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-1 rounded border border-emerald-300">
+                    💰 Stake Recomendada (Quarter-Kelly): <strong>{kelly.stakePct}% da Banca</strong>
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+                    Sem Valor Esperado positivo frente à Odd informada
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -112,18 +123,50 @@ export default function MatchResultBlock({ match }) {
           </div>
         </div>
 
-        {/* Placares Mais Prováveis */}
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            Top 5 Placares Mais Prováveis
-          </p>
-          <div className="grid grid-cols-5 gap-2">
-            {r.placares_top5?.map((p, i) => (
-              <div key={i} className="rounded-lg bg-slate-100 dark:bg-slate-800 p-2 text-center border">
-                <p className="text-base font-bold text-slate-900 dark:text-white">{p.placar}</p>
-                <p className="text-xs text-muted-foreground font-medium">{(p.prob * 100).toFixed(1)}%</p>
+        {/* Handicaps e Placares Prováveis */}
+        <div className="grid sm:grid-cols-2 gap-4 pt-1">
+          {/* Handicaps Derivados */}
+          {r.handicaps && (
+            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 p-3 border">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                Handicaps Asiáticos Derivados
+              </p>
+              <div className="space-y-1.5 text-xs font-medium">
+                <div className="flex justify-between">
+                  <span>DNB (AH 0.0) {home}:</span>
+                  <strong className="text-emerald-600 dark:text-emerald-400 font-bold">
+                    {(r.handicaps.dnb_home * 100).toFixed(1)}% (Odd {(1 / r.handicaps.dnb_home).toFixed(2)})
+                  </strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>DNB (AH 0.0) {away}:</span>
+                  <strong className="text-emerald-600 dark:text-emerald-400 font-bold">
+                    {(r.handicaps.dnb_away * 100).toFixed(1)}% (Odd {(1 / r.handicaps.dnb_away).toFixed(2)})
+                  </strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>AH -1.5 {home}:</span>
+                  <strong className="text-slate-900 dark:text-slate-100 font-bold">
+                    {(r.handicaps.ah_minus_15_home * 100).toFixed(1)}%
+                  </strong>
+                </div>
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Placares Mais Prováveis */}
+          <div>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+              Top 5 Placares Mais Prováveis
+            </p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {r.placares_top5?.map((p, i) => (
+                <div key={i} className="rounded-lg bg-slate-100 dark:bg-slate-800 p-1.5 text-center border">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">{p.placar}</p>
+                  <p className="text-[11px] text-muted-foreground font-medium">{(p.prob * 100).toFixed(1)}%</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

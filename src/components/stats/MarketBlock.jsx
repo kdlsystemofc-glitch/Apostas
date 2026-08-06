@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { poissonOver, sinalPoisson } from "@/lib/predictionEngine";
+import { poissonOver, sinalPoisson, calcularQuarterKelly } from "@/lib/predictionEngine";
 import SignalBadge from "./SignalBadge";
 
 export default function MarketBlock({ icon, title, homeName, awayName, xHome, xAway, xTotal, lines, sinalFn, warning }) {
@@ -15,9 +15,9 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
   const fairOdd = bestProb > 0 ? Math.max(1.01, Math.round((1 / bestProb) * 100) / 100) : "—";
   const bestSignal = useSinal(bestProb);
 
+  const kelly = calcularQuarterKelly(bestProb, bookieOdd);
   const oddNum = parseFloat(bookieOdd);
   const hasBookieOdd = !isNaN(oddNum) && oddNum > 1.0;
-  const realEV = hasBookieOdd ? ((bestProb * oddNum) - 1) * 100 : null;
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
@@ -75,10 +75,10 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
           </div>
         )}
 
-        {/* Calculador de EV+ Real Opcional */}
-        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-between gap-2 text-xs border-b">
-          <span className="text-muted-foreground font-medium">Comparar Odd da Casa:</span>
+        {/* Calculador de EV+ Real Opcional & Quarter Kelly */}
+        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 flex flex-wrap items-center justify-between gap-2 text-xs border-b">
           <div className="flex items-center gap-2">
+            <span className="text-muted-foreground font-medium">Comparar Odd da Casa:</span>
             <input
               type="number"
               step="0.01"
@@ -88,14 +88,21 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
               onChange={(e) => setBookieOdd(e.target.value)}
               className="w-20 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
-            {hasBookieOdd && realEV !== null && (
-              <span className={`px-2 py-0.5 rounded font-extrabold text-[11px] ${
-                realEV > 0 ? "bg-emerald-600 text-white" : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
-              }`}>
-                {realEV > 0 ? `🔥 EV+ +${realEV.toFixed(1)}%` : `EV ${realEV.toFixed(1)}%`}
-              </span>
-            )}
           </div>
+          {hasBookieOdd && (
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 rounded font-extrabold text-[11px] ${
+                kelly.isEVPlus ? "bg-emerald-600 text-white" : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+              }`}>
+                {kelly.isEVPlus ? `🔥 EV+ +${kelly.evPct.toFixed(1)}%` : `EV ${kelly.evPct.toFixed(1)}%`}
+              </span>
+              {kelly.isEVPlus && (
+                <span className="font-bold text-emerald-600 dark:text-emerald-400 text-[11px]">
+                  Stake (Quarter-Kelly): {kelly.stakePct}%
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tabela de Linhas Comerciais */}

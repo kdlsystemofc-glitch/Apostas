@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════
-// PREDICTION ENGINE — MOTOR AUTÔNOMO DE PREVISÃO ESTATÍSTICA
+// PREDICTION ENGINE V2 — MOTOR AUTÔNOMO REENGENHARIZADO
 // ══════════════════════════════════════════════════════════════
 
 const STAT_MAP = {
@@ -58,56 +58,30 @@ export function parseStatsHubText(text) {
   const lines = text.trim().split("\n");
 
   function extrairMedias(line) {
-    const parts = line.split("\t").map(p => p.trim()).filter(p => p);
-    const nums = parts
-      .map(p => parseFloat(p))
-      .filter(n => !isNaN(n));
-    return nums.length >= 3 ? nums : null;
+    const numbers = line.match(/\d+(?:\.\d+)?/g);
+    if (!numbers || numbers.length < 2) return null;
+    return {
+      t: parseFloat(numbers[0]),
+      c: parseFloat(numbers[1]),
+    };
   }
 
-  const primeiraLinhaValida = lines.find(l => {
-    const cols = l.split("\t");
-    return cols[0]?.trim() && STAT_MAP[cols[0]?.trim()];
-  });
-
-  if (primeiraLinhaValida) {
-    const cols = primeiraLinhaValida.split("\t");
-    const nums = extrairMedias(primeiraLinhaValida.split("\t").slice(1).join("\t"));
-    if (nums && nums.length >= 3 && cols.length >= 4) {
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        const cols = line.split("\t");
-        const statName = cols[0]?.trim();
-        if (statName && STAT_MAP[statName]) {
-          const nums = extrairMedias(cols.slice(1).join("\t"));
-          if (nums && nums.length >= 3) {
-            stats[STAT_MAP[statName]] = { t: nums[1], c: nums[2] };
-          }
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    for (const [label, key] of Object.entries(STAT_MAP)) {
+      if (line.toLowerCase() === label.toLowerCase() || line.toLowerCase().startsWith(label.toLowerCase())) {
+        let values = null;
+        if (i + 1 < lines.length) {
+          values = extrairMedias(lines[i + 1]);
         }
-      }
-      return stats;
-    }
-  }
-
-  let i = 0;
-  while (i < lines.length) {
-    const lineName = lines[i].split("\t")[0]?.trim();
-
-    if (lineName && STAT_MAP[lineName]) {
-      const key = STAT_MAP[lineName];
-      let found = false;
-      for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-        const nums = extrairMedias(lines[j]);
-        if (nums && nums.length >= 3) {
-          stats[key] = { t: nums[1], c: nums[2] };
-          i = j + 1;
-          found = true;
-          break;
+        if (!values) {
+          values = extrairMedias(line);
         }
+        if (values) {
+          stats[key] = values;
+        }
+        break;
       }
-      if (!found) i++;
-    } else {
-      i++;
     }
   }
 
@@ -117,6 +91,12 @@ export function parseStatsHubText(text) {
 // ── Helper: get stat value ──
 function g(stats, key, campo = "t") {
   return stats?.[key]?.[campo] || 0.0;
+}
+
+// ── Ponderação Bayesiana de Amostra (Bayesian Shrinkage) ──
+export function bayesianShrinkage(val, mediaLiga = 1.35, k = 10, n = 5) {
+  const w = n / (n + k);
+  return w * val + (1 - w) * mediaLiga;
 }
 
 // ── Core model functions ──
@@ -144,6 +124,21 @@ export function pesosDinamicos(componentes) {
   return Object.values(validos).reduce((s, [p, v]) => s + (p / totalPeso) * v, 0);
 }
 
+// ── Log-Gamma (Aproximação Lanczos para Binomial Negativa) ──
+export function logGamma(z) {
+  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - logGamma(1 - z);
+  z -= 1;
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7
+  ];
+  let x = c[0];
+  for (let i = 1; i < 9; i++) x += c[i] / (z + i);
+  const t = z + 7.5;
+  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+}
+
 function factorial(n) {
   if (n <= 1) return 1;
   let r = 1;
@@ -160,6 +155,44 @@ export function poissonOver(media, linha) {
   return Math.max(0, Math.min(1, 1 - under));
 }
 
+// ── Distribuição Binomial Negativa (NB2 para Cartões e Faltas - Sobredispersão) ──
+export function negativeBinomialOver(media, linha, r = 4.0) {
+  if (media <= 0) return 0;
+  const kMax = Math.floor(linha);
+  let pUnder = 0;
+  const p = r / (r + media);
+  const logP = Math.log(p);
+  const log1p = Math.log(1 - p);
+  const logGammaR = logGamma(r);
+
+  let logFact = 0;
+  for (let k = 0; k <= kMax; k++) {
+    if (k > 1) logFact += Math.log(k);
+    const logPMF = logGamma(k + r) - logGammaR - logFact + r * logP + k * log1p;
+    pUnder += Math.exp(logPMF);
+  }
+  return Math.max(0, Math.min(1, 1 - pUnder));
+}
+
+// ── Gestão de Banca e Risk Management via Quarter-Kelly ──
+export function calcularQuarterKelly(prob, oddCasa) {
+  const p = parseFloat(prob);
+  const b = parseFloat(oddCasa) - 1;
+  if (isNaN(p) || isNaN(b) || b <= 0 || p <= 0) return { stakePct: 0, isEVPlus: false, evPct: 0 };
+
+  const q = 1 - p;
+  const kellyFull = (p * b - q) / b;
+  const kellyQuarter = Math.max(0, kellyFull * 0.25);
+  const stakePct = Math.round(kellyQuarter * 100 * 10) / 10;
+  const evPct = Math.round((p * (b + 1) - 1) * 100 * 10) / 10;
+
+  return {
+    stakePct,
+    isEVPlus: kellyQuarter > 0 && evPct > 0,
+    evPct,
+  };
+}
+
 export function sinalPoisson(prob) {
   if (prob >= 0.75) return { label: "FORTE OVER", color: "green" };
   if (prob >= 0.65) return { label: "OVER", color: "yellow" };
@@ -173,6 +206,14 @@ export function sinalPoissonGols(prob) {
   if (prob >= 0.70) return { label: "OVER", color: "yellow" };
   if (prob <= 0.22) return { label: "FORTE UNDER", color: "red" };
   if (prob <= 0.32) return { label: "UNDER", color: "gray" };
+  return { label: "NEUTRO", color: "gray" };
+}
+
+export function sinalBTTS(p) {
+  if (p >= 0.70) return { label: "FORTE OVER", color: "green" };
+  if (p >= 0.60) return { label: "OVER", color: "yellow" };
+  if (p <= 0.30) return { label: "FORTE UNDER", color: "red" };
+  if (p <= 0.40) return { label: "UNDER", color: "gray" };
   return { label: "NEUTRO", color: "gray" };
 }
 
@@ -283,29 +324,22 @@ function calcShotsOnTarget(atk, def_, isHome = false) {
 
   return {
     value: Math.round(xs * 100) / 100,
-    details: { base: Math.round(base * 1000) / 1000, io: Math.round(io * 10000) / 10000, id: Math.round(id_ * 10000) / 10000 },
+    details: { base: Math.round(base * 1000) / 1000, ic: Math.round(ic * 10000) / 10000 },
   };
 }
 
 // ── Market 4: BTTS ──
 function calcBTTS(statsCasa, statsFora) {
-  const xgCasa = calcGols(statsCasa, statsFora, true).value;
-  const xgFora = calcGols(statsFora, statsCasa, false).value;
+  const xgC = calcGols(statsCasa, statsFora, true).value;
+  const xgF = calcGols(statsFora, statsCasa, false).value;
 
-  const pCasaMarca = 1 - Math.exp(-xgCasa);
-  const pForaMarca = 1 - Math.exp(-xgFora);
-  let pBtts = pCasaMarca * pForaMarca;
-
-  pBtts = Math.max(0, Math.min(1, pBtts));
+  const pH = 1 - Math.exp(-xgC);
+  const pA = 1 - Math.exp(-xgF);
 
   return {
-    value: Math.round(pBtts * 10000) / 10000,
-    details: {
-      xg_casa: xgCasa,
-      xg_fora: xgFora,
-      p_casa_marca: Math.round(pCasaMarca * 10000) / 10000,
-      p_fora_marca: Math.round(pForaMarca * 10000) / 10000,
-    },
+    p_btts: Math.round(pH * pA * 10000) / 10000,
+    p_casa_marca: Math.round(pH * 10000) / 10000,
+    p_fora_marca: Math.round(pA * 10000) / 10000,
   };
 }
 
@@ -359,7 +393,7 @@ function calcSaves(atk, def_) {
   const fatores = {
     shots_on_target: [0.45, indice(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c"))],
     shots_in_box:    [0.25, indice(g(atk, "shots_in_box"),    g(def_, "shots_in_box",    "c"))],
-    big_chance_crtd: [0.15, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
+    big_chance:      [0.15, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
     total_shots:     [0.15, indice(g(atk, "total_shots"),     g(def_, "total_shots",     "c"))],
   };
 
@@ -370,15 +404,17 @@ function calcSaves(atk, def_) {
   };
 }
 
-// ── Market 9: Chutes Totais ──
+// ── Market 8: Chutes Totais ──
 function calcTotalShots(atk, def_, isHome = false) {
   const base = ancora(g(atk, "total_shots"), g(def_, "total_shots", "c"));
+
   const fatores = {
-    total_shots:        [0.40, indice(g(atk, "total_shots"),        g(def_, "total_shots",        "c"))],
-    shots_in_box:       [0.25, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],
-    touches_opp_box:    [0.20, indice(g(atk, "touches_opp_box"),    g(def_, "touches_opp_box",    "c"))],
-    big_chance_created: [0.15, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
+    total_shots:     [0.40, indice(g(atk, "total_shots"),     g(def_, "total_shots",     "c"))],
+    shots_in_box:    [0.25, indice(g(atk, "shots_in_box"),    g(def_, "shots_in_box",    "c"))],
+    touches_opp_box: [0.20, indice(g(atk, "touches_opp_box"), g(def_, "touches_opp_box", "c"))],
+    big_chance:      [0.15, indice(g(atk, "big_chance_created"), g(def_, "big_chance_created", "c"))],
   };
+
   const ic = pesosDinamicos(fatores);
   let xt = base * ic;
   if (isHome) {
@@ -392,10 +428,11 @@ function calcTotalShots(atk, def_, isHome = false) {
   };
 }
 
-// ── Market 1X2 com Ajuste Dixon-Coles e Declaração Estrita de Vitória/Empate ──
+// ── Market 1X2, BTTS Bivariado e Handicaps (Matriz Dixon-Coles 8x8) ──
 export function calcResultado(xgCasa, xgFora) {
   const maxGols = 8;
   let pCasa = 0, pEmpate = 0, pFora = 0;
+  let pBTTS = 0;
   const placares = [];
 
   function poissonPMF(k, lambda) {
@@ -417,10 +454,14 @@ export function calcResultado(xgCasa, xgFora) {
     for (let j = 0; j <= maxGols; j++) {
       const tau = dixonColesTau(i, j, xgCasa, xgFora);
       const p = poissonPMF(i, xgCasa) * poissonPMF(j, xgFora) * tau;
-      placares.push({ home: i, away: j, prob: Math.max(0, p) });
-      if (i > j) pCasa += Math.max(0, p);
-      else if (i === j) pEmpate += Math.max(0, p);
-      else pFora += Math.max(0, p);
+      const probVal = Math.max(0, p);
+      placares.push({ home: i, away: j, prob: probVal });
+
+      if (i > j) pCasa += probVal;
+      else if (i === j) pEmpate += probVal;
+      else pFora += probVal;
+
+      if (i > 0 && j > 0) pBTTS += probVal;
     }
   }
 
@@ -429,6 +470,7 @@ export function calcResultado(xgCasa, xgFora) {
     pCasa /= totalP;
     pEmpate /= totalP;
     pFora /= totalP;
+    pBTTS /= totalP;
   }
 
   placares.sort((a, b) => b.prob - a.prob);
@@ -449,10 +491,23 @@ export function calcResultado(xgCasa, xgFora) {
 
   const oddMinima = Math.max(1.01, Math.round((1 / probVencedora) * 100) / 100);
 
+  // Derivação de Handicaps Asiáticos e Draw No Bet (DNB)
+  const dnbHome = pCasa / (pCasa + pFora || 1);
+  const dnbAway = pFora / (pCasa + pFora || 1);
+  const ahMinus15Home = placares.filter(p => p.home - p.away >= 2).reduce((s, p) => s + p.prob, 0) / (totalP || 1);
+  const ahMinus15Away = placares.filter(p => p.away - p.home >= 2).reduce((s, p) => s + p.prob, 0) / (totalP || 1);
+
   return {
     p_casa_vence: Math.round(pCasa * 10000) / 10000,
     p_empate:     Math.round(pEmpate * 10000) / 10000,
     p_fora_vence: Math.round(pFora * 10000) / 10000,
+    p_btts:       Math.round(pBTTS * 10000) / 10000,
+    handicaps: {
+      dnb_home: Math.round(dnbHome * 10000) / 10000,
+      dnb_away: Math.round(dnbAway * 10000) / 10000,
+      ah_minus_15_home: Math.round(ahMinus15Home * 10000) / 10000,
+      ah_minus_15_away: Math.round(ahMinus15Away * 10000) / 10000,
+    },
     pick_1x2: {
       resultado: resultadoEstrito,
       prob: Math.round(probVencedora * 10000) / 10000,
@@ -465,7 +520,7 @@ export function calcResultado(xgCasa, xgFora) {
   };
 }
 
-// ── Full match analysis (100% Autônomo sem FootyStats) ──
+// ── Full match analysis (100% Autônomo sem FootyStats - V2 Engine) ──
 export function analisarJogo(statsCasa, statsFora) {
   const corners_casa = calcCorners(statsCasa, statsFora, true);
   const corners_fora = calcCorners(statsFora, statsCasa, false);
@@ -474,67 +529,74 @@ export function analisarJogo(statsCasa, statsFora) {
 
   const resultado = calcResultado(gols_casa.value, gols_fora.value);
 
-  const shots_casa = calcShotsOnTarget(statsCasa, statsFora);
-  const shots_fora = calcShotsOnTarget(statsFora, statsCasa);
-  const btts = calcBTTS(statsCasa, statsFora);
-  const cards_casa = calcCartoes(statsCasa, statsFora, true);
-  const cards_fora = calcCartoes(statsFora, statsCasa, false);
+  const shots_casa = calcShotsOnTarget(statsCasa, statsFora, true);
+  const shots_fora = calcShotsOnTarget(statsFora, statsCasa, false);
 
-  const fouls_casa = calcFaltas(statsCasa, statsFora);
-  const fouls_fora = calcFaltas(statsFora, statsCasa);
+  const cartoes_casa = calcCartoes(statsCasa, statsFora, true);
+  const cartoes_fora = calcCartoes(statsFora, statsCasa, false);
 
-  const saves_goleiro_casa = calcSaves(statsFora, statsCasa);
-  const saves_goleiro_fora = calcSaves(statsCasa, statsFora);
+  const faltas_casa = calcFaltas(statsCasa, statsFora);
+  const faltas_fora = calcFaltas(statsFora, statsCasa);
 
-  const totalshots_casa = calcTotalShots(statsCasa, statsFora);
-  const totalshots_fora = calcTotalShots(statsFora, statsCasa);
+  const saves_casa = calcSaves(statsCasa, statsFora);
+  const saves_fora = calcSaves(statsFora, statsCasa);
+
+  const total_shots_casa = calcTotalShots(statsCasa, statsFora, true);
+  const total_shots_fora = calcTotalShots(statsFora, statsCasa, false);
+
+  const xg_total = Math.round((gols_casa.value + gols_fora.value) * 100) / 100;
+  const xc_total = Math.round((corners_casa.value + corners_fora.value) * 100) / 100;
+  const xs_total = Math.round((shots_casa.value + shots_fora.value) * 100) / 100;
+  const xcard_total = Math.round((cartoes_casa.value + cartoes_fora.value) * 100) / 100;
+  const xfouls_total = Math.round((faltas_casa.value + faltas_fora.value) * 100) / 100;
+  const xsaves_total = Math.round((saves_casa.value + saves_fora.value) * 100) / 100;
+  const xtotalshots_total = Math.round((total_shots_casa.value + total_shots_fora.value) * 100) / 100;
 
   return {
-    p_casa_vence: resultado.p_casa_vence,
-    p_empate: resultado.p_empate,
-    p_fora_vence: resultado.p_fora_vence,
-    pick_1x2: resultado.pick_1x2,
-    placares_top5: resultado.placares_top5,
+    xg_casa: gols_casa.value,
+    xg_fora: gols_fora.value,
+    xg_total,
+    gols_details_casa: gols_casa.details,
+    gols_details_fora: gols_fora.details,
 
     xc_casa: corners_casa.value,
     xc_fora: corners_fora.value,
-    xc_total: Math.round((corners_casa.value + corners_fora.value) * 100) / 100,
-    dc: corners_casa.details,
-    df: corners_fora.details,
-
-    xg_casa: gols_casa.value,
-    xg_fora: gols_fora.value,
-    xg_total: Math.round((gols_casa.value + gols_fora.value) * 100) / 100,
+    xc_total,
+    corners_details_casa: corners_casa.details,
+    corners_details_fora: corners_fora.details,
 
     xs_casa: shots_casa.value,
     xs_fora: shots_fora.value,
-    xs_total: Math.round((shots_casa.value + shots_fora.value) * 100) / 100,
+    xs_total,
 
-    p_btts: btts.value,
-    db: btts.details,
+    xcard_casa: cartoes_casa.value,
+    xcard_fora: cartoes_fora.value,
+    xcard_total,
 
-    xcard_casa: cards_casa.value,
-    xcard_fora: cards_fora.value,
-    xcard_total: Math.round((cards_casa.value + cards_fora.value) * 100) / 100,
+    xfouls_casa: faltas_casa.value,
+    xfouls_fora: faltas_fora.value,
+    xfouls_total,
 
-    xfouls_casa: fouls_casa.value,
-    xfouls_fora: fouls_fora.value,
-    xfouls_total: Math.round((fouls_casa.value + fouls_fora.value) * 100) / 100,
+    xsaves_casa: saves_casa.value,
+    xsaves_fora: saves_fora.value,
+    xsaves_total,
 
-    xsaves_casa: saves_goleiro_casa.value,
-    xsaves_fora: saves_goleiro_fora.value,
-    xsaves_total: Math.round((saves_goleiro_casa.value + saves_goleiro_fora.value) * 100) / 100,
+    xtotalshots_casa: total_shots_casa.value,
+    xtotalshots_fora: total_shots_fora.value,
+    xtotalshots_total,
 
-    xtotalshots_casa: totalshots_casa.value,
-    xtotalshots_fora: totalshots_fora.value,
-    xtotalshots_total: Math.round((totalshots_casa.value + totalshots_fora.value) * 100) / 100,
+    p_casa_vence: resultado.p_casa_vence,
+    p_empate:     resultado.p_empate,
+    p_fora_vence: resultado.p_fora_vence,
+    pick_1x2:     resultado.pick_1x2,
+    placares_top5: resultado.placares_top5,
+    handicaps:    resultado.handicaps,
+
+    p_btts:       resultado.p_btts,
+    db: {
+      p_btts:       resultado.p_btts,
+      p_casa_marca: Math.round((1 - Math.exp(-gols_casa.value)) * 10000) / 10000,
+      p_fora_marca: Math.round((1 - Math.exp(-gols_fora.value)) * 10000) / 10000,
+    },
   };
-}
-
-export function sinalBTTS(p) {
-  if (p >= 0.72) return { label: "SIM · FORTE", color: "green" };
-  if (p >= 0.60) return { label: "SIM · POSSÍVEL", color: "yellow" };
-  if (p <= 0.35) return { label: "NÃO · FORTE", color: "red" };
-  if (p <= 0.45) return { label: "NÃO · POSSÍVEL", color: "gray" };
-  return { label: "NEUTRO", color: "gray" };
 }

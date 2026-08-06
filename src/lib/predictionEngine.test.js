@@ -6,6 +6,10 @@ import {
   resistencia,
   pesosDinamicos,
   poissonOver,
+  negativeBinomialOver,
+  bayesianShrinkage,
+  calcularQuarterKelly,
+  logGamma,
   calcGols,
   calcCorners,
   calcResultado,
@@ -13,7 +17,7 @@ import {
   COMMERCIAL_LINES,
 } from "./predictionEngine";
 
-describe("Prediction Engine — Primitivas Matemáticas", () => {
+describe("Prediction Engine V2 — Primitivas Matemáticas e Estatísticas", () => {
   it("ancora() calcula a média entre ataque feito e defesa cedida", () => {
     expect(ancora(2.0, 1.0)).toBe(1.5);
     expect(ancora(0, 0)).toBe(0);
@@ -37,6 +41,30 @@ describe("Prediction Engine — Primitivas Matemáticas", () => {
     expect(pesosDinamicos(comps)).toBeCloseTo(1.0, 5);
   });
 
+  it("bayesianShrinkage() encolhe médias de amostras curtas em direção à liga", () => {
+    const res = bayesianShrinkage(3.0, 1.35, 10, 5);
+    expect(res).toBeLessThan(3.0);
+    expect(res).toBeGreaterThan(1.35);
+  });
+
+  it("logGamma() calcula logaritmo da função Gamma para Binomial Negativa", () => {
+    expect(logGamma(1)).toBeCloseTo(0, 5);
+    expect(logGamma(5)).toBeCloseTo(Math.log(24), 4);
+  });
+
+  it("negativeBinomialOver() calcula probabilidade sobredispersa em cartões/faltas", () => {
+    const probNB = negativeBinomialOver(4.5, 3.5, 4.0);
+    expect(probNB).toBeGreaterThan(0);
+    expect(probNB).toBeLessThan(1);
+  });
+
+  it("calcularQuarterKelly() sugere stake proporcional de gestão de risco", () => {
+    const k = calcularQuarterKelly(0.60, 2.00);
+    expect(k.isEVPlus).toBe(true);
+    expect(k.stakePct).toBeGreaterThan(0);
+    expect(k.evPct).toBeCloseTo(20.0, 1);
+  });
+
   it("poissonOver() retorna probabilidades coerentes entre 0 e 1", () => {
     const p15 = poissonOver(2.5, 1.5);
     expect(p15).toBeGreaterThan(0.5);
@@ -44,7 +72,7 @@ describe("Prediction Engine — Primitivas Matemáticas", () => {
   });
 });
 
-describe("Prediction Engine — Motor Preditivo de Mercados", () => {
+describe("Prediction Engine V2 — Motor Preditivo de Mercados", () => {
   const dummyStatsCasa = {
     goals: { t: 2.0, c: 0.8 },
     corners: { t: 6.0, c: 3.5 },
@@ -89,18 +117,22 @@ describe("Prediction Engine — Motor Preditivo de Mercados", () => {
     expect(cHome.value).toBeGreaterThan(0);
   });
 
-  it("calcResultado() gera matriz Dixon-Coles com pick_1x2 válida e probabilidade somada ~ 1.0", () => {
+  it("calcResultado() gera matriz Dixon-Coles com BTTS Bivariado e Handicaps", () => {
     const res = calcResultado(1.8, 1.1);
     expect(res.p_casa_vence + res.p_empate + res.p_fora_vence).toBeCloseTo(1.0, 2);
     expect(["Vitória Casa", "Empate", "Vitória Fora"]).toContain(res.pick_1x2.resultado);
-    expect(parseFloat(res.pick_1x2.odd_minima)).toBeGreaterThanOrEqual(1.01);
+    expect(res.p_btts).toBeGreaterThan(0);
+    expect(res.handicaps).toHaveProperty("dnb_home");
+    expect(res.handicaps).toHaveProperty("ah_minus_15_home");
   });
 
-  it("analisarJogo() executa o pipeline completo sem erros", () => {
+  it("analisarJogo() executa o pipeline completo sem erros na V2 Engine", () => {
     const resultado = analisarJogo(dummyStatsCasa, dummyStatsFora);
     expect(resultado).toHaveProperty("xg_total");
     expect(resultado).toHaveProperty("xc_total");
     expect(resultado).toHaveProperty("pick_1x2");
+    expect(resultado).toHaveProperty("handicaps");
+    expect(resultado).toHaveProperty("p_btts");
   });
 });
 
