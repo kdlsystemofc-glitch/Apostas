@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { ChevronRight, Calendar } from "lucide-react";
+import { ChevronRight, Calendar, Sparkles } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { poissonOver, sinalPoisson, sinalPoissonGols, sinalBTTS, COMMERCIAL_LINES } from "@/lib/predictionEngine";
 
@@ -58,26 +58,29 @@ function getMatchSignals(match) {
   const totalshots = bestSignalCommercial("Chutes Totais", r.xtotalshots_total, COMMERCIAL_LINES.total_shots_total);
   if (totalshots && totalshots.sinal.label !== "NEUTRO") signals.push(totalshots);
 
-  // BTTS
-  const bttsSinal = sinalBTTS(r.p_btts);
-  const bttsOddMin = r.p_btts > 0 ? Math.max(1.01, Math.round((1 / r.p_btts) * 100) / 100) : "—";
-  signals.push({
-    market: "Ambas Marcam",
-    prob: r.p_btts,
-    oddMinima: bttsOddMin,
-    sinal: bttsSinal,
-    strength: Math.abs(r.p_btts - 0.5),
-    isBTTS: true,
-  });
+  // BTTS Bivariado
+  if (r.p_btts != null) {
+    const sBTTS = sinalBTTS(r.p_btts);
+    if (sBTTS.label !== "NEUTRO") {
+      signals.push({
+        market: "Ambas Marcam",
+        prob: r.p_btts,
+        oddMinima: r.p_btts > 0 ? Math.max(1.01, Math.round((1 / r.p_btts) * 100) / 100) : "—",
+        sinal: sBTTS,
+        strength: Math.abs(r.p_btts - 0.5),
+        isBTTS: true,
+      });
+    }
+  }
 
   return signals.sort((a, b) => b.strength - a.strength);
 }
 
 const colorClasses = {
-  green: "bg-emerald-500 text-white",
-  yellow: "bg-amber-400 text-amber-950",
-  red: "bg-red-500 text-white",
-  gray: "bg-slate-300 text-slate-700",
+  green: "bg-emerald-950/80 text-emerald-300 border border-emerald-500/40",
+  yellow: "bg-amber-950/80 text-amber-300 border border-amber-500/40",
+  red: "bg-rose-950/80 text-rose-300 border border-rose-500/40",
+  gray: "bg-slate-800 text-slate-300 border border-slate-700",
 };
 
 export default function DailyOverview() {
@@ -91,31 +94,32 @@ export default function DailyOverview() {
 
   if (loading) {
     return (
-      <div className="space-y-3 p-6">
-        <Skeleton className="h-8 w-3/4" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
+      <div className="space-y-4 p-4 bg-slate-900/80 rounded-xl border border-slate-800">
+        <Skeleton className="h-6 w-48 bg-slate-800" />
+        <Skeleton className="h-28 w-full bg-slate-800" />
+        <Skeleton className="h-28 w-full bg-slate-800" />
       </div>
     );
   }
 
   if (matches.length === 0) {
     return (
-      <div className="text-center py-20">
-        <p className="text-muted-foreground">Nenhuma análise realizada ainda.</p>
-        <p className="text-sm text-muted-foreground mt-1">Crie sua primeira análise na aba "Nova Análise".</p>
+      <div className="text-center py-20 bg-slate-900/60 rounded-xl border border-slate-800 text-white">
+        <p className="text-slate-300 font-bold text-base">Nenhum jogo cadastrado ainda.</p>
+        <p className="text-xs text-slate-400 mt-1">Cadastre jogos para visualizar o painel de Apostas do Dia.</p>
       </div>
     );
   }
 
-  const grouped = {};
-  matches.forEach((m) => {
-    const dateKey = m.date || "Sem data";
-    if (!grouped[dateKey]) grouped[dateKey] = [];
-    grouped[dateKey].push(m);
-  });
+  // Agrupa por data
+  const grouped = matches.reduce((acc, m) => {
+    const d = m.date || "Sem data";
+    if (!acc[d]) acc[d] = [];
+    acc[d].push(m);
+    return acc;
+  }, {});
 
-  const dateLabels = Object.keys(grouped).sort((a, b) => (a < b ? 1 : -1));
+  const dateLabels = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
   const formatDate = (dateStr) => {
     if (dateStr === "Sem data") return dateStr;
@@ -128,15 +132,15 @@ export default function DailyOverview() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-white">
       {dateLabels.map((dateKey) => (
         <div key={dateKey}>
           <div className="flex items-center gap-2 mb-3 px-1">
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide capitalize">
+            <Calendar className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-sm font-extrabold text-slate-200 uppercase tracking-wide capitalize">
               {formatDate(dateKey)}
             </h3>
-            <span className="text-xs text-muted-foreground">({grouped[dateKey].length} {grouped[dateKey].length === 1 ? "jogo" : "jogos"})</span>
+            <span className="text-xs text-slate-400 font-semibold">({grouped[dateKey].length} {grouped[dateKey].length === 1 ? "jogo" : "jogos"})</span>
           </div>
 
           <div className="space-y-3">
@@ -147,47 +151,49 @@ export default function DailyOverview() {
               return (
                 <div
                   key={match.id}
-                  className="rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                  className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md overflow-hidden hover:border-slate-700 transition-all cursor-pointer shadow-xl group"
                   onClick={() => navigate(`/match/${match.id}`)}
                 >
-                  <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between">
+                  <div className="px-4 py-3 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        match.status === "completed" ? "bg-emerald-500" : "bg-amber-400"
+                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                        match.status === "completed" ? "bg-emerald-400" : "bg-amber-400 animate-pulse"
                       }`} />
-                      <p className="font-semibold text-sm">
-                        {match.home_team} <span className="text-muted-foreground font-normal mx-0.5">vs</span> {match.away_team}
+                      <p className="font-extrabold text-base text-white">
+                        {match.home_team} <span className="text-emerald-400 font-bold mx-1 text-sm">vs</span> {match.away_team}
                       </p>
                       {match.real_results && Object.keys(match.real_results).length > 0 && (
-                        <p className="text-xs text-emerald-600 font-medium ml-2">✓ Resultado registrado</p>
+                        <p className="text-xs text-emerald-400 font-bold ml-2 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
+                          ✓ Resultado Registrado
+                        </p>
                       )}
                     </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-400 transition-colors" />
                   </div>
 
-                  <div className="p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  <div className="p-3.5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                     {signals.map((sig, i) => (
-                      <div key={i} className="rounded-lg bg-slate-50 p-3 text-center border">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide truncate">{sig.market}</p>
+                      <div key={i} className="rounded-lg bg-slate-950/60 p-3 text-center border border-slate-800/80">
+                        <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide truncate">{sig.market}</p>
                         {sig.isResult ? (
                           <>
-                            <p className="text-base font-extrabold mt-0.5 text-emerald-700">{sig.sinal.label}</p>
-                            <p className="text-xs font-semibold">{(sig.prob * 100).toFixed(0)}% <span className="text-muted-foreground text-[10px]">(Odd {sig.oddMinima})</span></p>
+                            <p className="text-base font-black mt-0.5 text-emerald-400 truncate">{sig.sinal.label}</p>
+                            <p className="text-xs font-bold text-white tabular-nums">{(sig.prob * 100).toFixed(1)}% <span className="text-slate-400 text-[10px]">(Odd {sig.oddMinima})</span></p>
                           </>
                         ) : sig.isBTTS ? (
                           <>
-                            <p className="text-lg font-bold mt-0.5">{(sig.prob * 100).toFixed(0)}%</p>
-                            <p className="text-[10px] text-emerald-600 font-bold">Odd Justa: {sig.oddMinima}</p>
-                            <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClasses[sig.sinal.color]}`}>
+                            <p className="text-lg font-black text-white tabular-nums mt-0.5">{(sig.prob * 100).toFixed(1)}%</p>
+                            <p className="text-[10px] text-emerald-400 font-bold">Odd Justa: {sig.oddMinima}</p>
+                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-extrabold ${colorClasses[sig.sinal.color]}`}>
                               {sig.sinal.label}
                             </span>
                           </>
                         ) : (
                           <>
-                            <p className="text-[11px] font-bold text-slate-800 mt-0.5">Over {sig.line}</p>
-                            <p className="text-lg font-bold">{(sig.prob * 100).toFixed(0)}%</p>
-                            <p className="text-[10px] text-emerald-600 font-bold">Odd Justa: {sig.oddMinima}</p>
-                            <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClasses[sig.sinal.color]}`}>
+                            <p className="text-xs font-bold text-slate-200 mt-0.5">Over {sig.line}</p>
+                            <p className="text-lg font-black text-white tabular-nums">{(sig.prob * 100).toFixed(1)}%</p>
+                            <p className="text-[10px] text-emerald-400 font-bold">Odd Justa: {sig.oddMinima}</p>
+                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-extrabold ${colorClasses[sig.sinal.color]}`}>
                               {sig.sinal.label}
                             </span>
                           </>
@@ -197,14 +203,16 @@ export default function DailyOverview() {
                   </div>
 
                   {topSignal && (
-                    <div className="px-4 py-2 bg-slate-900 text-white flex items-center justify-between text-xs">
-                      <span className="text-slate-300">🔥 Aposta de Maior Valor:</span>
-                      <span className="font-semibold text-emerald-400">
+                    <div className="px-4 py-2.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs font-bold">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Aposta de Maior Valor:
+                      </span>
+                      <span className="font-extrabold text-emerald-400 tabular-nums">
                         {topSignal.isResult
-                          ? `${topSignal.sinal.label} — ${(topSignal.prob * 100).toFixed(0)}% (Odd Justa: ${topSignal.oddMinima})`
+                          ? `${topSignal.sinal.label} — ${(topSignal.prob * 100).toFixed(1)}% (Odd Justa: ${topSignal.oddMinima})`
                           : topSignal.isBTTS
-                          ? `Ambas Marcam (${topSignal.sinal.label}) — ${(topSignal.prob * 100).toFixed(0)}% (Odd Justa: ${topSignal.oddMinima})`
-                          : `${topSignal.market} Over ${topSignal.line} — ${(topSignal.prob * 100).toFixed(0)}% (Odd Justa: ${topSignal.oddMinima})`}
+                          ? `Ambas Marcam (${topSignal.sinal.label}) — ${(topSignal.prob * 100).toFixed(1)}% (Odd Justa: ${topSignal.oddMinima})`
+                          : `${topSignal.market} Over ${topSignal.line} — ${(topSignal.prob * 100).toFixed(1)}% (Odd Justa: ${topSignal.oddMinima})`}
                       </span>
                     </div>
                   )}

@@ -75,37 +75,52 @@ export default function StatsInput({ onAnalysisComplete }) {
   const placeholderTextFora = "Cole aqui as estatísticas do time de fora.\n\nFormatos aceitos:\n• Direto do StatsHub: copie a tabela inteira do site\n• Via Excel: copie do Excel após colar do StatsHub\n\nEstatísticas necessárias: Goals, Corners, Cards, Shots On Target, Total Shots, Fouls, etc.";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-slate-900/90 backdrop-blur-md p-6 rounded-xl border border-slate-800 shadow-xl text-white">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">🏠 Time da Casa (mandante)</Label>
-          <Input value={homeTeam} onChange={e => setHomeTeam(e.target.value)} placeholder="Ex: Argentina" className="mt-1.5" />
+          <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">🏠 Time da Casa (mandante)</Label>
+          <Input
+            value={homeTeam}
+            onChange={e => setHomeTeam(e.target.value)}
+            placeholder="Ex: Argentina"
+            className="mt-1.5 bg-slate-950 border-slate-700 text-white font-bold placeholder:text-slate-500 focus:ring-2 focus:ring-emerald-500"
+          />
         </div>
         <div>
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">✈️ Time de Fora (visitante)</Label>
-          <Input value={awayTeam} onChange={e => setAwayTeam(e.target.value)} placeholder="Ex: Austria" className="mt-1.5" />
+          <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">✈️ Time de Fora (visitante)</Label>
+          <Input
+            value={awayTeam}
+            onChange={e => setAwayTeam(e.target.value)}
+            placeholder="Ex: Austria"
+            className="mt-1.5 bg-slate-950 border-slate-700 text-white font-bold placeholder:text-slate-500 focus:ring-2 focus:ring-emerald-500"
+          />
         </div>
         <div>
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Data do Jogo</Label>
-          <Input type="date" value={matchDate} onChange={e => setMatchDate(e.target.value)} className="mt-1.5" />
+          <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Data do Jogo</Label>
+          <Input
+            type="date"
+            value={matchDate}
+            onChange={e => setMatchDate(e.target.value)}
+            className="mt-1.5 bg-slate-950 border-slate-700 text-white font-bold focus:ring-2 focus:ring-emerald-500"
+          />
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-            <ClipboardPaste className="w-3.5 h-3.5" />
+          <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <ClipboardPaste className="w-3.5 h-3.5 text-emerald-400" />
             Estatísticas — {homeTeam || "Casa"}
           </Label>
           <Textarea
             value={homeText}
             onChange={e => setHomeText(e.target.value)}
             placeholder={placeholderTextCasa}
-            className="mt-1.5 h-48 font-mono text-xs"
+            className="mt-1.5 h-48 font-mono text-xs bg-slate-950 border-slate-700 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500"
           />
-          <div className={`mt-1.5 text-xs font-medium ${
-            homeStatsCount >= 10 ? "text-emerald-600" :
-            homeStatsCount >= 5 ? "text-amber-600" : "text-red-500"
+          <div className={`mt-1.5 text-xs font-bold tabular-nums ${
+            homeStatsCount >= 10 ? "text-emerald-400" :
+            homeStatsCount >= 5 ? "text-amber-400" : "text-rose-400"
           }`}>
             {homeText.length > 5 ? `${homeStatsCount} estatísticas detectadas` : ""}
             {homeStatsCount >= 10 && " ✓"}
@@ -113,19 +128,19 @@ export default function StatsInput({ onAnalysisComplete }) {
           </div>
         </div>
         <div>
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-            <ClipboardPaste className="w-3.5 h-3.5" />
+          <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <ClipboardPaste className="w-3.5 h-3.5 text-emerald-400" />
             Estatísticas — {awayTeam || "Fora"}
           </Label>
           <Textarea
             value={awayText}
             onChange={e => setAwayText(e.target.value)}
             placeholder={placeholderTextFora}
-            className="mt-1.5 h-48 font-mono text-xs"
+            className="mt-1.5 h-48 font-mono text-xs bg-slate-950 border-slate-700 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500"
           />
-          <div className={`mt-1.5 text-xs font-medium ${
-            awayStatsCount >= 10 ? "text-emerald-600" :
-            awayStatsCount >= 5 ? "text-amber-600" : "text-red-500"
+          <div className={`mt-1.5 text-xs font-bold tabular-nums ${
+            awayStatsCount >= 10 ? "text-emerald-400" :
+            awayStatsCount >= 5 ? "text-amber-400" : "text-rose-400"
           }`}>
             {awayText.length > 5 ? `${awayStatsCount} estatísticas detectadas` : ""}
             {awayStatsCount >= 10 && " ✓"}
@@ -135,17 +150,21 @@ export default function StatsInput({ onAnalysisComplete }) {
       </div>
 
       {statsInsuficientes && (homeText.length > 10 || awayText.length > 10) && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-3">
-          <p className="text-xs text-red-700 font-medium">
+        <div className="rounded-lg bg-rose-950/80 border border-rose-800 p-3.5">
+          <p className="text-xs text-rose-300 font-bold">
             ⚠ Formato não reconhecido — {homeStatsCount} stats (casa) / {awayStatsCount} stats (fora)
           </p>
-          <p className="text-xs text-red-600 mt-1">
+          <p className="text-xs text-rose-200 mt-1">
             Dica: copie a tabela inteira do StatsHub (todas as linhas de Goals até Yellow Cards)
           </p>
         </div>
       )}
 
-      <Button onClick={handleAnalyze} disabled={statsInsuficientes || loading || !homeTeam.trim() || !awayTeam.trim()} className="w-full h-12 text-base font-semibold">
+      <Button
+        onClick={handleAnalyze}
+        disabled={statsInsuficientes || loading || !homeTeam.trim() || !awayTeam.trim()}
+        className="w-full h-12 text-base font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white border-0 shadow-lg shadow-emerald-600/30 transition-all"
+      >
         {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Zap className="w-5 h-5 mr-2" />}
         {loading ? "Analisando..." : "Analisar Jogo"}
       </Button>

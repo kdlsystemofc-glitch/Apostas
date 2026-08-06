@@ -68,7 +68,7 @@ function calcBloco(matches) {
       mae: mae.toFixed(2),
       winRate,
       avaliacao: Math.abs(vies) < 0.3 ? "✓ Calibrado" : Math.abs(vies) < 0.7 ? "⚠ Leve viés" : "✗ Revisar",
-      cor: Math.abs(vies) < 0.3 ? "text-emerald-600" : Math.abs(vies) < 0.7 ? "text-amber-600" : "text-red-600",
+      cor: Math.abs(vies) < 0.3 ? "text-emerald-400 font-bold" : Math.abs(vies) < 0.7 ? "text-amber-400 font-bold" : "text-rose-400 font-bold",
     };
   });
 }
@@ -94,10 +94,10 @@ export default function CalibrationView() {
 
   if (loading) {
     return (
-      <div className="space-y-3 p-6">
-        <Skeleton className="h-8 w-3/4" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
+      <div className="space-y-3 p-6 bg-slate-900/80 rounded-xl border border-slate-800">
+        <Skeleton className="h-8 w-3/4 bg-slate-800" />
+        <Skeleton className="h-32 w-full bg-slate-800" />
+        <Skeleton className="h-32 w-full bg-slate-800" />
       </div>
     );
   }
@@ -105,9 +105,9 @@ export default function CalibrationView() {
   const completed = matches.filter(m => m.status === "completed");
   if (completed.length === 0) {
     return (
-      <div className="text-center py-20">
-        <p className="text-muted-foreground">Nenhum jogo com resultado registrado ainda.</p>
-        <p className="text-sm text-muted-foreground mt-1">Registre resultados reais nos jogos para ver a calibração.</p>
+      <div className="text-center py-20 bg-slate-900/60 rounded-xl border border-slate-800 text-white">
+        <p className="text-slate-300 font-bold text-base">Nenhum jogo com resultado registrado ainda.</p>
+        <p className="text-xs text-slate-400 mt-1">Registre resultados reais nos jogos para visualizar o relatório de calibração.</p>
       </div>
     );
   }
@@ -119,10 +119,10 @@ export default function CalibrationView() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border bg-card p-5">
-        <h3 className="font-semibold text-sm">Como interpretar</h3>
-        <p className="text-xs text-muted-foreground mt-1">
+    <div className="space-y-6 text-white">
+      <div className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md p-5 shadow-xl">
+        <h3 className="font-bold text-sm text-emerald-400">Como interpretar os indicadores</h3>
+        <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
           <strong>Viés</strong> = previsão média − real médio. Positivo = modelo superestima, negativo = subestima.<br/>
           <strong>MAE</strong> = erro absoluto médio (quanto o modelo erra em unidades reais por jogo).<br/>
           <strong>Calibrado</strong> se viés &lt; 0.30 · <strong>Leve viés</strong> se 0.30–0.70 · <strong>Revisar pesos</strong> se &gt; 0.70
@@ -134,42 +134,42 @@ export default function CalibrationView() {
         const inicio = i * BLOCK_SIZE + 1;
         const fim = Math.min((i + 1) * BLOCK_SIZE, completed.length);
         return (
-          <div key={i} className="rounded-xl border bg-card overflow-hidden">
-            <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between">
-              <span className="font-semibold text-sm">Bloco {i + 1} — Jogos {inicio}–{fim}</span>
-              <span className="text-xs text-slate-400">{bloco.length} jogos com resultado</span>
+          <div key={i} className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md overflow-hidden shadow-xl">
+            <div className="px-5 py-3 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800">
+              <span className="font-bold text-sm text-slate-100">Bloco {i + 1} — Jogos {inicio}–{fim}</span>
+              <span className="text-xs font-semibold text-slate-400">{bloco.length} jogos avaliados</span>
             </div>
             <div className="p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {stats.map(s => (
-                  <div key={s.key} className="rounded-lg bg-slate-50 p-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{LABELS[s.key]}</p>
+                  <div key={s.key} className="rounded-lg bg-slate-950/60 p-3.5 border border-slate-800/80">
+                    <p className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">{LABELS[s.key]}</p>
                     {s.status === "insuficiente" ? (
-                      <p className="text-xs text-slate-400 mt-1">Dados insuficientes ({s.n} jogos)</p>
+                      <p className="text-xs text-slate-500 mt-1">Dados insuficientes ({s.n} jogos)</p>
                     ) : (
-                      <>
-                        <div className="flex justify-between mt-2 text-xs">
-                          <span className="text-muted-foreground">Previsto</span>
-                          <span className="font-medium">{s.mediaPrev}</span>
+                      <div className="mt-2 space-y-1 text-xs tabular-nums font-semibold">
+                        <div className="flex justify-between text-slate-300">
+                          <span>Previsto</span>
+                          <span className="font-bold text-white">{s.mediaPrev}</span>
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-muted-foreground">Real</span>
-                          <span className="font-medium">{s.mediaReal}</span>
+                        <div className="flex justify-between text-slate-300">
+                          <span>Real</span>
+                          <span className="font-bold text-white">{s.mediaReal}</span>
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-muted-foreground">Viés</span>
-                          <span className={`font-medium ${s.cor}`}>{s.vies > 0 ? "+" : ""}{s.vies}</span>
+                        <div className="flex justify-between text-slate-300">
+                          <span>Viés</span>
+                          <span className={s.cor}>{s.vies > 0 ? "+" : ""}{s.vies}</span>
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-muted-foreground">MAE</span>
-                          <span className="font-medium">{s.mae}</span>
+                        <div className="flex justify-between text-slate-300">
+                          <span>MAE</span>
+                          <span className="font-bold text-white">{s.mae}</span>
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-muted-foreground">Taxa Acerto</span>
-                          <span className="font-bold text-slate-900">{s.winRate}%</span>
+                        <div className="flex justify-between border-t border-slate-800/60 pt-1 text-slate-300">
+                          <span>Taxa Acerto</span>
+                          <span className="font-extrabold text-emerald-400">{s.winRate}%</span>
                         </div>
-                        <p className={`text-xs font-semibold mt-2 ${s.cor}`}>{s.avaliacao}</p>
-                      </>
+                        <p className={`text-[11px] font-extrabold mt-1.5 ${s.cor}`}>{s.avaliacao}</p>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -179,11 +179,10 @@ export default function CalibrationView() {
         );
       })}
 
-      <div className="rounded-xl border bg-amber-50 border-amber-200 p-4">
-        <p className="text-xs text-amber-800">
-          <strong>Lembrete:</strong> os pesos do modelo são hipóteses manuais, não calibrados por dados. 
-          Com 30+ jogos você já consegue identificar se algum mercado está sistematicamente errado. 
-          Com 100+ jogos, vale ajustar os pesos no código.
+      <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 p-4">
+        <p className="text-xs text-amber-300 font-medium">
+          <strong>Lembrete de Calibração V2:</strong> O modelo utiliza parâmetros bayesianos calibrados. 
+          Com 30+ jogos registrados, avalie o viés do mercado desejado para confirmar a rentabilidade de longo prazo.
         </p>
       </div>
     </div>
