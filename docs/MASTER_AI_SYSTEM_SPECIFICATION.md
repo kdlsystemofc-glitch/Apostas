@@ -1,64 +1,47 @@
 # ESPECIFICAÇÃO TÉCNICA MESTRE E GUIA COMPLETO PARA INTELIGÊNCIA ARTIFICIAL
 ## MASTER AI SPECIFICATION & HANDOVER GUIDE FOR SPORTS PREDICTOR V2
 
-> **AVISO IMPORTANTE PARA OUTRAS IAs / DESENVOLVEDORES:** Este é o **documento definitivo e unificado** sobre o sistema **Sports Predictor V2**. Ele reúne toda a engenharia reversa, matemática estatística, dicionário completo de estatísticas do StatsHub, cruzamento de parâmetros ofensivos/defensivos, Binomial Negativa (NB2), Ambas Marcam Bivariado, Handicaps Asiáticos, Gestão Quarter-Kelly, componentes visuais de UI/UX, linhas comerciais e arquitetura de calibração. NENHUMA informação foi omitida.
+> **AVISO IMPORTANTE PARA OUTRAS IAs / DESENVOLVEDORES:** Este é o **documento definitivo e unificado** sobre o sistema **Sports Predictor V2**. Ele reúne toda a engenharia reversa, matemática estatística, dicionário completo de estatísticas do StatsHub, cruzamento de parâmetros ofensivos/defensivos, Binomial Negativa (NB2), Ambas Marcam Bivariado, Handicaps Asiáticos, Gestão Quarter-Kelly, Clean Architecture (5 camadas), Zustand Stores, Supabase Repository Pattern, Code-Splitting (< 470 kB) e arquitetura de calibração. NENHUMA informação foi omitida.
 
 ---
 
-## 1. VISÃO GERAL DA ARQUITETURA E FLUXO DE DADOS
+## 1. VISÃO GERAL DA ARQUITETURA DE 5 CAMADAS (CLEAN ARCHITECTURE)
 
-O **Sports Predictor V2** é um motor estatístico autônomo e sistema web desenvolvido em React 18, Vite e Tailwind CSS, integrado a um banco de dados PostgreSQL no Supabase.
-
-### Fluxograma Geral do Pipeline de Dados V2:
+O **Sports Predictor V2** é estruturado em uma **Clean Architecture** totalmente desacoplada de 5 camadas:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 1. INGESTÃO DE DADOS (StatsInput.jsx)                                       │
-│ • O usuário cola o texto bruto do StatsHub ou do Excel.                     │
-│ • Execução da função parseStatsHubText(text).                               │
-│ • Mapeamento das 29+ estatísticas do STAT_MAP.                             │
-│ • Estruturação dos objetos: statsCasa e statsFora.                          │
-│   Cada stat contém: { t: valor_time_fez, c: valor_time_cedeu }.              │
+│ 1. DOMAIN LAYER (src/domain/ & src/lib/predictionEngine.js)                │
+│ • Motor probabilístico síncrono puro (zero dependência de React/UI).        │
+│ • Poisson, Binomial Negativa NB2, Dixon-Coles Bivariado, Quarter-Kelly.     │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 2. MOTOR ESTATÍSTICO V2 (predictionEngine.js)                               │
-│ • Bayesian Shrinkage Layer: bayesianShrinkage(val, mediaLiga, k=10, n=5).   │
-│ • Cálculo das Âncoras Base: ancora(faz, cede) = (faz + cede) / 2.            │
-│ • Cruzamento Ofensivo vs Defensivo (GLM Indexing):                          │
-│   - Ataque: indice(feito, cedido) = feito / ((feito + cedido)/2).           │
-│   - Defesa: resistencia(cedidoDef, feitoAtk) = ln(1+cedidoDef)/ln(1+feitoAtk)│
-│ • Obtenção dos Lambdas (Expectativas de Gols, Escanteios, Cartões, Faltas). │
+│ 2. SERVICES & REPOSITORY LAYER (src/services/supabase & parsers)            │
+│ • MatchRepository: Abstração CRUD de partidas e perfis no Supabase.         │
+│ • statsHubParser: Serviço de ingestão e relatório visual de erros no texto. │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 3. MODELAGEM DE PROBABILIDADES E DISTRIBUIÇÕES V2                           │
-│ • Poisson CDF (Gols, Escanteios, Chutes).                                   │
-│ • Binomial Negativa NB2 (Cartões, Faltas) -> Corrige Sobredispersão.        │
-│ • Matriz 8x8 Dixon-Coles Bivariada (1X2, BTTS Bivariado e Placares).        │
-│ • Integrador de Handicaps Asiáticos (AH -0.5, AH -1.5) e DNB (AH 0.0).      │
-│ • Gestão de Risco Quarter-Kelly: calcularQuarterKelly(prob, oddCasa).       │
+│ 3. STATE & DATA FETCHING LAYER (src/store/)                                 │
+│ • useMatchStore (Zustand): Estado global de partidas ativas e histórico.    │
+│ • useBankrollStore (Zustand): Gestão de banca em R$ e fração Kelly.         │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 4. CAMADA VISUAL E DASHBOARDS DE INTERFACE (React Components)               │
-│ • MatchResultBlock.jsx -> Pick 1X2 + Odd Justa + EV+ Real + Stake Kelly.    │
-│ • MarketBlock.jsx      -> Highlight Linha Base + Odd Justa + Stake Kelly.   │
-│ • BestBetsByMarket.jsx -> Ranking de Apostas + Handicaps Asiáticos.         │
-│ • CornerDetails.jsx    -> Tabela de Sub-Fatores Ofensivos/Defensivos.       │
-│ • DailyOverview.jsx    -> Painel Diário de Jogos e Melhores Entradas.        │
-│ • ErrorBoundary.jsx    -> Captura de Exceções (Prevenção Tela Branca).      │
+│ 4. HOOKS LAYER (src/hooks/)                                                 │
+│ • Abstrações de cálculo memoizado, sincronização e gestão de risco.         │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 5. PERSISTÊNCIA, RLS & SISTEMA DE CALIBRAÇÃO                                │
-│ • Supabase PostgreSQL (Tabela `matches` com RLS ativado).                   │
-│ • MatchDetail.jsx -> Preenchimento de Resultados Reais pós-jogo.            │
-│ • CalibrationView.jsx -> Avaliação por Blocos de 10 Jogos (Viés, MAE, Win%).│
+│ 5. PRESENTATION LAYER (src/components/ & src/pages/)                        │
+│ • UI Primitives (Radix UI / Shadcn) + Feature Components.                   │
+│ • Code-Splitting com React.lazy() no App.jsx (Bundle inicial < 470 kB).      │
+│ • ErrorBoundary global de resiliência visual.                               │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -128,7 +111,15 @@ O parser `parseStatsHubText(text)` lê a tabela de estatísticas colada e extrai
 
 ---
 
-## 4. LINHAS COMERCIAIS REAIS (`COMMERCIAL_LINES`)
+## 4. GERENCIAMENTO DE ESTADO E REPOSITÓRIOS
+
+- **`useMatchStore.js`:** Gerencia estado global de partidas e seleção ativas.
+- **`useBankrollStore.js`:** Armazena a banca total em R$ (ex: R$ 1.000,00) e calcula o valor da stake recomendada em dinheiro real.
+- **`MatchRepository.js`:** Abstração completa de consultas REST ao Supabase.
+
+---
+
+## 5. LINHAS COMERCIAIS REAIS (`COMMERCIAL_LINES`)
 
 ```javascript
 export const COMMERCIAL_LINES = {
@@ -148,15 +139,6 @@ export const COMMERCIAL_LINES = {
   fouls_team:         [10.5, 12.5, 14.5],
 };
 ```
-
----
-
-## 5. DESIGN DE INTERFACE V2 E GESTÃO DE RISCO
-
-1. **`MatchResultBlock.jsx`:** Exibe a Pick 1X2, a Odd Justa ($1/P$), o calculador de EV+ Real, os Handicaps Asiáticos (DNB, AH -1.5) e a **Stake Recomendada em % da Banca via Quarter-Kelly**.
-2. **`MarketBlock.jsx`:** Exibe a Linha Comercial Recomendada, a Odd Justa, o campo de Odd da Casa e a sugestão de Stake Quarter-Kelly por mercado.
-3. **`ErrorBoundary.jsx`:** Garante captura elegante de erros de renderização.
-4. **`predictionEngine.test.js`:** Suíte Vitest com 14 testes unitários automatizados.
 
 ---
 
