@@ -97,7 +97,7 @@ export default function BestBetsByMarket({ match }) {
                   {(r.pick_1x2.prob * 100).toFixed(1)}%
                 </span>
                 <span className="text-xs text-muted-foreground ml-2">
-                  Odd Min: <strong className="text-emerald-600 font-bold">{r.pick_1x2.odd_minima}</strong>
+                  Odd Justa: <strong className="text-emerald-600 font-bold">{r.pick_1x2.odd_minima}</strong>
                 </span>
               </div>
               <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-600 text-white">
@@ -134,7 +134,7 @@ export default function BestBetsByMarket({ match }) {
                   {(best.prob * 100).toFixed(1)}%
                 </span>
                 <span className="text-xs text-muted-foreground ml-2">
-                  Odd Min: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{best.oddMinima}</strong>
+                  Odd Justa: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{best.oddMinima}</strong>
                 </span>
               </div>
               <span className={`px-2 py-0.5 rounded text-xs font-bold ${colorClasses[best.sinal.color]}`}>
@@ -161,7 +161,7 @@ export default function BestBetsByMarket({ match }) {
                 {(r.p_btts * 100).toFixed(1)}%
               </span>
               <span className="text-xs text-muted-foreground ml-2">
-                Odd Min: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{bttsOddMin}</strong>
+                Odd Justa: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{bttsOddMin}</strong>
               </span>
             </div>
             <span className={`px-2 py-0.5 rounded text-xs font-bold ${colorClasses[bttsSinal.color]}`}>
@@ -187,7 +187,7 @@ export default function BestBetsByMarket({ match }) {
               🏆 Sinal mais forte do mercado:
             </span>
             <span className="text-sm font-bold text-emerald-800 dark:text-emerald-200">
-              {sorted[0].label} · Over {sorted[0].best.linha} · {(sorted[0].best.prob * 100).toFixed(1)}% (Odd Min: {sorted[0].best.oddMinima})
+              {sorted[0].label} · Over {sorted[0].best.linha} · {(sorted[0].best.prob * 100).toFixed(1)}% (Odd Justa: {sorted[0].best.oddMinima})
             </span>
           </div>
         )

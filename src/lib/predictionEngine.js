@@ -120,21 +120,21 @@ function g(stats, key, campo = "t") {
 }
 
 // ── Core model functions ──
-function indice(feito, cedido) {
+export function indice(feito, cedido) {
   const ref = (feito + cedido) / 2;
   return ref > 0 ? feito / ref : 1.0;
 }
 
-function resistencia(cedidoDef, feitoAtk, cap = 2.0) {
+export function resistencia(cedidoDef, feitoAtk, cap = 2.0) {
   if (feitoAtk <= 0) return 1.0;
   return Math.min(Math.log1p(cedidoDef) / Math.log1p(feitoAtk), cap);
 }
 
-function ancora(timeFaz, advCede) {
+export function ancora(timeFaz, advCede) {
   return (timeFaz + advCede) / 2;
 }
 
-function pesosDinamicos(componentes) {
+export function pesosDinamicos(componentes) {
   const validos = {};
   for (const [k, [p, v]] of Object.entries(componentes)) {
     if (v > 0) validos[k] = [p, v];
@@ -177,7 +177,7 @@ export function sinalPoissonGols(prob) {
 }
 
 // ── Market 1: Corners ──
-function calcCorners(atk, def_, isHome = false) {
+export function calcCorners(atk, def_, isHome = false) {
   const base = ancora(g(atk, "corners"), g(def_, "corners", "c"));
 
   const ofensivos = {
@@ -221,7 +221,7 @@ function calcCorners(atk, def_, isHome = false) {
 }
 
 // ── Market 2: Goals ──
-function calcGols(atk, def_, isHome = false) {
+export function calcGols(atk, def_, isHome = false) {
   const base = ancora(g(atk, "goals"), g(def_, "goals", "c"));
 
   const ofensivos = {
@@ -393,7 +393,7 @@ function calcTotalShots(atk, def_, isHome = false) {
 }
 
 // ── Market 1X2 com Ajuste Dixon-Coles e Declaração Estrita de Vitória/Empate ──
-function calcResultado(xgCasa, xgFora) {
+export function calcResultado(xgCasa, xgFora) {
   const maxGols = 8;
   let pCasa = 0, pEmpate = 0, pFora = 0;
   const placares = [];

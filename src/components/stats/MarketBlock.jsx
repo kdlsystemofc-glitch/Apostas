@@ -3,6 +3,7 @@ import { poissonOver, sinalPoisson } from "@/lib/predictionEngine";
 import SignalBadge from "./SignalBadge";
 
 export default function MarketBlock({ icon, title, homeName, awayName, xHome, xAway, xTotal, lines, sinalFn, warning }) {
+  const [bookieOdd, setBookieOdd] = useState("");
   const useSinal = sinalFn || sinalPoisson;
 
   // Encontra a linha mais próxima do valor esperado para destacar como linha principal
@@ -11,8 +12,12 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
     : lines?.[0];
 
   const bestProb = closestLine != null ? poissonOver(xTotal, closestLine) : 0;
-  const bestOdd = bestProb > 0 ? Math.max(1.01, Math.round((1 / bestProb) * 100) / 100) : "—";
+  const fairOdd = bestProb > 0 ? Math.max(1.01, Math.round((1 / bestProb) * 100) / 100) : "—";
   const bestSignal = useSinal(bestProb);
+
+  const oddNum = parseFloat(bookieOdd);
+  const hasBookieOdd = !isNaN(oddNum) && oddNum > 1.0;
+  const realEV = hasBookieOdd ? ((bestProb * oddNum) - 1) * 100 : null;
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
@@ -47,10 +52,10 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
 
         {/* Highlight da Recomendação da Linha de Valor */}
         {closestLine != null && (
-          <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+          <div className="p-4 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 block mb-0.5">
-                🔥 Linha Principal Recomendada
+                🔥 Linha Comercial Recomendada
               </span>
               <p className="text-base font-extrabold text-white">
                 Over {closestLine} {title}
@@ -62,7 +67,7 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
                   {(bestProb * 100).toFixed(1)}%
                 </span>
                 <span className="text-[11px] text-slate-300 font-medium">
-                  Odd Min: <strong className="text-white">{bestOdd}</strong>
+                  Odd Justa: <strong className="text-white">{fairOdd}</strong>
                 </span>
               </div>
               <SignalBadge label={bestSignal.label} color={bestSignal.color} />
@@ -70,15 +75,38 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
           </div>
         )}
 
+        {/* Calculador de EV+ Real Opcional */}
+        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-between gap-2 text-xs border-b">
+          <span className="text-muted-foreground font-medium">Comparar Odd da Casa:</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              step="0.01"
+              min="1.01"
+              placeholder="Ex: 1.85"
+              value={bookieOdd}
+              onChange={(e) => setBookieOdd(e.target.value)}
+              className="w-20 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            {hasBookieOdd && realEV !== null && (
+              <span className={`px-2 py-0.5 rounded font-extrabold text-[11px] ${
+                realEV > 0 ? "bg-emerald-600 text-white" : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+              }`}>
+                {realEV > 0 ? `🔥 EV+ +${realEV.toFixed(1)}%` : `EV ${realEV.toFixed(1)}%`}
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* Tabela de Linhas Comerciais */}
         <div className="px-4 py-3">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
-            Linhas Comerciais Disponíveis (Odds Mínimas EV+)
+            Linhas Comerciais Disponíveis (Odds Justas)
           </p>
           <div className="space-y-1.5">
             {lines?.map(line => {
               const prob = poissonOver(xTotal, line);
-              const oddMin = prob > 0 ? Math.max(1.01, Math.round((1 / prob) * 100) / 100) : "—";
+              const lineFairOdd = prob > 0 ? Math.max(1.01, Math.round((1 / prob) * 100) / 100) : "—";
               const sinal = useSinal(prob);
               const isClosest = line === closestLine;
 
@@ -105,7 +133,7 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
                         {(prob * 100).toFixed(1)}%
                       </span>
                       <span className="text-[11px] text-muted-foreground ml-2">
-                        Odd Min: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{oddMin}</strong>
+                        Odd Justa: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{lineFairOdd}</strong>
                       </span>
                     </div>
                     <SignalBadge label={sinal.label} color={sinal.color} />

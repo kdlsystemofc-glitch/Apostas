@@ -177,7 +177,7 @@ export default function DailyOverview() {
                         ) : sig.isBTTS ? (
                           <>
                             <p className="text-lg font-bold mt-0.5">{(sig.prob * 100).toFixed(0)}%</p>
-                            <p className="text-[10px] text-emerald-600 font-bold">Odd Min: {sig.oddMinima}</p>
+                            <p className="text-[10px] text-emerald-600 font-bold">Odd Justa: {sig.oddMinima}</p>
                             <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClasses[sig.sinal.color]}`}>
                               {sig.sinal.label}
                             </span>
@@ -186,7 +186,7 @@ export default function DailyOverview() {
                           <>
                             <p className="text-[11px] font-bold text-slate-800 mt-0.5">Over {sig.line}</p>
                             <p className="text-lg font-bold">{(sig.prob * 100).toFixed(0)}%</p>
-                            <p className="text-[10px] text-emerald-600 font-bold">Odd Min: {sig.oddMinima}</p>
+                            <p className="text-[10px] text-emerald-600 font-bold">Odd Justa: {sig.oddMinima}</p>
                             <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClasses[sig.sinal.color]}`}>
                               {sig.sinal.label}
                             </span>
@@ -201,10 +201,10 @@ export default function DailyOverview() {
                       <span className="text-slate-300">🔥 Aposta de Maior Valor:</span>
                       <span className="font-semibold text-emerald-400">
                         {topSignal.isResult
-                          ? `${topSignal.sinal.label} — ${(topSignal.prob * 100).toFixed(0)}% (Odd Min: ${topSignal.oddMinima})`
+                          ? `${topSignal.sinal.label} — ${(topSignal.prob * 100).toFixed(0)}% (Odd Justa: ${topSignal.oddMinima})`
                           : topSignal.isBTTS
-                          ? `Ambas Marcam (${topSignal.sinal.label}) — ${(topSignal.prob * 100).toFixed(0)}% (Odd Min: ${topSignal.oddMinima})`
-                          : `${topSignal.market} Over ${topSignal.line} — ${(topSignal.prob * 100).toFixed(0)}% (Odd Min: ${topSignal.oddMinima})`}
+                          ? `Ambas Marcam (${topSignal.sinal.label}) — ${(topSignal.prob * 100).toFixed(0)}% (Odd Justa: ${topSignal.oddMinima})`
+                          : `${topSignal.market} Over ${topSignal.line} — ${(topSignal.prob * 100).toFixed(0)}% (Odd Justa: ${topSignal.oddMinima})`}
                       </span>
                     </div>
                   )}

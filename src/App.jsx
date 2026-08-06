@@ -17,6 +17,8 @@ import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 
+import ErrorBoundary from '@/components/ErrorBoundary';
+
 const AuthenticatedApp = () => {
   return (
     <Routes>
@@ -41,7 +43,9 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
-          <AuthenticatedApp />
+          <ErrorBoundary>
+            <AuthenticatedApp />
+          </ErrorBoundary>
         </Router>
         <Toaster />
       </QueryClientProvider>

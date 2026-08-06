@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 
 export default function MatchResultBlock({ match }) {
+  const [bookieOdd, setBookieOdd] = useState("");
   const r = match.results;
   if (!r?.p_casa_vence) return null;
 
@@ -20,6 +21,11 @@ export default function MatchResultBlock({ match }) {
   })();
 
   const pickTitle = pick.resultado === "Vitória Casa" ? `Vitória ${home}` : pick.resultado === "Vitória Fora" ? `Vitória ${away}` : pick.resultado;
+
+  // Cálculo do Expected Value (EV+) Real quando o usuário informa a Odd da Casa de Apostas
+  const oddNum = parseFloat(bookieOdd);
+  const hasBookieOdd = !isNaN(oddNum) && oddNum > 1.0;
+  const realEV = hasBookieOdd ? ((pick.prob * oddNum) - 1) * 100 : null;
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
@@ -43,13 +49,43 @@ export default function MatchResultBlock({ match }) {
               {(pick.prob * 100).toFixed(1)}% Confiança
             </span>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-1">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-1">
             <p className="text-xl font-black text-slate-900 dark:text-white">
               {pickTitle}
             </p>
-            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border shadow-sm">
-              Odd Mínima (EV+): <span className="text-emerald-600 font-extrabold">{pick.odd_minima}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border shadow-sm">
+                Odd Justa (Fair Odd): <span className="text-emerald-600 font-extrabold">{pick.odd_minima}</span>
+              </div>
+              {hasBookieOdd && realEV !== null && (
+                <div className={`text-xs font-extrabold px-3 py-1.5 rounded-lg border ${
+                  realEV > 0
+                    ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
+                    : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950 dark:text-rose-200"
+                }`}>
+                  {realEV > 0 ? `🔥 EV+ +${realEV.toFixed(1)}%` : `EV ${realEV.toFixed(1)}%`}
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* Campo Opcional para Inserção da Odd da Casa (Calculador EV+ Real) */}
+          <div className="mt-3.5 pt-3 border-t border-emerald-200/60 dark:border-emerald-800/60 flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground font-medium whitespace-nowrap">Odd da Casa (Bet365 / Pinnacle):</span>
+            <input
+              type="number"
+              step="0.01"
+              min="1.01"
+              placeholder="Ex: 2.10"
+              value={bookieOdd}
+              onChange={(e) => setBookieOdd(e.target.value)}
+              className="w-24 px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+            {hasBookieOdd && (
+              <span className="text-[11px] text-muted-foreground ml-1">
+                {realEV > 0 ? "✓ Aposta de Valor Esperado Positivo!" : "✗ Sem Valor Esperado frente à Odd informada"}
+              </span>
+            )}
           </div>
         </div>
 
