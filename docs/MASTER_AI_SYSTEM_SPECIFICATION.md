@@ -163,7 +163,7 @@ $$w'_i = \frac{w_i}{\sum_{k \in \text{Válidos}} w_k} \implies I_{\text{composto
     - $\text{shots\_on\_target}$: Peso **0.25** ($\text{indice}$)
     - $\text{shots\_in\_box}$: Peso **0.25** ($\text{indice}$)
     - $\text{crosses}$: Peso **0.20** ($\text{indice}$) ➔ Volume de bolas alçadas na área.
-    - $\text{touches\_opp\_box}$: Peso **0.15** ($\text{indice}$)
+    - $\text{touches\_opp_box}$: Peso **0.15** ($\text{indice}$)
     - $\text{big\_chance\_missed}$: Peso **0.10** ($\text{indice}$) ➔ Rebates da zaga e defesas para escanteio.
     - $\text{total\_shots}$: Peso **0.05** ($\text{indice}$)
   - **Fatores Defensivos (40% do Peso Total):**
@@ -268,9 +268,9 @@ export const COMMERCIAL_LINES = {
 
 ## 5. REGRAS DE DESIGN DE UI/UX E VISUALIZAÇÃO
 
-1. **Card "Pick Principal do Modelo" (`MatchResultBlock.jsx`):** Exibe em destaque no topo a entrada recomendada do 1X2 (ex: **Vitória Argentina**), o percentual de confiança e a **Odd Mínima EV+**.
+1. **Card "Pick Principal do Modelo" (`MatchResultBlock.jsx`):** Exibe em destaque no topo a entrada recomendada do 1X2 (ex: **Vitória Argentina**), o percentual de confiança e a Odd Mínima EV+.
 2. **Card de Mercado (`MarketBlock.jsx`):** Exibe a **Linha Comercial Recomendada** (a linha de `COMMERCIAL_LINES` mais próxima do valor esperado) no destaque central escuro, seguida da tabela de linhas comerciais reais contendo o percentual e a Odd Mínima de cada linha.
-3. **Melhor Aposta por Mercado (`BestBetsByMarket.jsx`):** Ordena todos os mercados pelo desvio $|P - 0.50|$ para ranquear onde estão os melhores valores da partida.
+3. **Melhor Aposta por Mercado (`BestBetsByMarket.jsx`):** Ordena os mercados pelo desvio $|P - 0.50|$ para ranquear onde estão os melhores valores da partida.
 4. **Detalhamento de Escanteios (`CornerDetails.jsx`):** Exibe a tabela completa de fatores ofensivos e defensivos com os pesos e os valores parciais de cada time.
 
 ---
@@ -297,4 +297,4 @@ O módulo de calibração permite avaliar a precisão das projeções acumuladas
 - `real_results` (jsonb, placares e dados reais salvos pós-jogo para calibração)
 
 ---
- Este documento consolida 100% das especificações técnicas, matemáticas e operacionais do **Sports Predictor**, servindo como fonte única da verdade para qualquer Agente de IA.
+Este documento consolida 100% das especificações técnicas, matemáticas e operacionais do **Sports Predictor**, servindo como fonte única da verdade para qualquer Agente de IA.
