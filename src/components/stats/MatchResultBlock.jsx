@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { calcularQuarterKelly } from "@/lib/predictionEngine";
+import { calcularQuarterKelly, avaliarPalpiteExplicit } from "@/lib/predictionEngine";
 import { useBankrollStore } from "@/store/useBankrollStore";
-import { Trophy, TrendingUp, DollarSign, ShieldAlert } from "lucide-react";
+import { Trophy, TrendingUp, DollarSign, ShieldAlert, CheckCircle2, XCircle } from "lucide-react";
 
 export default function MatchResultBlock({ match }) {
   const [bookieOdd, setBookieOdd] = useState("");
-  const { totalBankroll, calculateStakeAmount } = useBankrollStore();
+  const { calculateStakeAmount } = useBankrollStore();
 
   const r = match.results;
   if (!r?.p_casa_vence) return null;
@@ -27,6 +27,13 @@ export default function MatchResultBlock({ match }) {
 
   const pickTitle = pick.resultado === "Vitória Casa" ? `Vitória ${home}` : pick.resultado === "Vitória Fora" ? `Vitória ${away}` : pick.resultado;
 
+  // Avaliação de Resultado Real GREEN / RED
+  const realRes = match.real_results || {
+    real_goals_home: match.real_goals_home,
+    real_goals_away: match.real_goals_away,
+  };
+  const evalResult = avaliarPalpiteExplicit("1x2", pick, realRes);
+
   // Gestão de Risco e Stake via Quarter-Kelly
   const kelly = calcularQuarterKelly(pick.prob, bookieOdd);
   const oddNum = parseFloat(bookieOdd);
@@ -40,17 +47,35 @@ export default function MatchResultBlock({ match }) {
         <h3 className="font-semibold flex items-center gap-2 text-base text-slate-100">
           <Trophy className="w-4 h-4 text-emerald-400" /> Resultado Esperado (1X2)
         </h3>
-        <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full font-bold">
-          Modelo Dixon-Coles V2
-        </span>
+        <div className="flex items-center gap-2">
+          {evalResult.status !== "PENDENTE" && (
+            <span className={`text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 shadow-md ${
+              evalResult.isGreen
+                ? "bg-emerald-600 text-white border border-emerald-400"
+                : "bg-rose-600 text-white border border-rose-400"
+            }`}>
+              {evalResult.isGreen ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+              {evalResult.isGreen ? "GREEN (ACERTOU)" : "RED (ERROU)"}
+            </span>
+          )}
+          <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full font-bold">
+            Modelo Dixon-Coles V2.1
+          </span>
+        </div>
       </div>
 
       <div className="p-5 space-y-5">
         {/* HERO DECISION CARD (Teste do Olhar de 1 Segundo) */}
-        <div className="rounded-xl border-2 border-emerald-500/40 bg-emerald-950/20 p-4 relative overflow-hidden">
+        <div className={`rounded-xl border-2 p-4 relative overflow-hidden transition-all ${
+          evalResult.status === "PENDENTE"
+            ? "border-emerald-500/40 bg-emerald-950/20"
+            : evalResult.isGreen
+            ? "border-emerald-500 bg-emerald-950/30 shadow-lg shadow-emerald-500/10"
+            : "border-rose-500 bg-rose-950/30 shadow-lg shadow-rose-500/10"
+        }`}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-              🔥 Pick Principal do Modelo (1-Second Decision)
+              🔥 Palpite Assumido pelo Sistema (1-Second Decision)
             </span>
             <span className="text-xs font-black bg-emerald-600 text-white px-2.5 py-0.5 rounded shadow-sm">
               {(pick.prob * 100).toFixed(1)}% Confiança
@@ -58,9 +83,18 @@ export default function MatchResultBlock({ match }) {
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-1">
-            <p className="text-2xl font-black text-white tracking-tight">
-              {pickTitle}
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-2xl font-black text-white tracking-tight">
+                {pickTitle}
+              </p>
+              {evalResult.status !== "PENDENTE" && (
+                <span className={`text-xs font-black px-2.5 py-1 rounded border uppercase ${
+                  evalResult.isGreen ? "bg-emerald-950 text-emerald-300 border-emerald-500" : "bg-rose-950 text-rose-300 border-rose-500"
+                }`}>
+                  {evalResult.isGreen ? "✓ Resultado Correto" : "✗ Resultado Incorreto"}
+                </span>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="text-xs font-bold text-slate-200 bg-slate-800/90 px-3 py-1.5 rounded-lg border border-slate-700 shadow-sm tabular-nums">
                 Odd Justa: <span className="text-emerald-400 font-extrabold">{pick.odd_minima}</span>

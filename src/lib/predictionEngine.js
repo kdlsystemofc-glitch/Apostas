@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════
-// PREDICTION ENGINE V2 — MOTOR AUTÔNOMO REENGENHARIZADO
+// PREDICTION ENGINE V2.1 — MOTOR AUTÔNOMO RE-CALIBRADO COM VERIFICAÇÃO GREEN/RED
 // ══════════════════════════════════════════════════════════════
 
 const STAT_MAP = {
@@ -46,9 +46,9 @@ export const COMMERCIAL_LINES = {
   shots_target_team:  [3.5, 4.5, 5.5],
   total_shots_total:  [21.5, 23.5, 25.5, 27.5],
   total_shots_team:   [10.5, 12.5, 14.5],
-  saves_total:        [5.5, 6.5, 7.5],
+  saves_total:        [4.5, 5.5, 6.5, 7.5],
   saves_team:         [2.5, 3.5, 4.5],
-  fouls_total:        [22.5, 24.5, 26.5],
+  fouls_total:        [21.5, 23.5, 25.5, 27.5],
   fouls_team:         [10.5, 12.5, 14.5],
 };
 
@@ -121,7 +121,8 @@ export function pesosDinamicos(componentes) {
   }
   if (Object.keys(validos).length === 0) return 1.0;
   const totalPeso = Object.values(validos).reduce((s, [p]) => s + p, 0);
-  return Object.values(validos).reduce((s, [p, v]) => s + (p / totalPeso) * v, 0);
+  const icRaw = Object.values(validos).reduce((s, [p, v]) => s + (p / totalPeso) * v, 0);
+  return 1.0 + (icRaw - 1.0) * 0.40;
 }
 
 // ── Log-Gamma (Aproximação Lanczos para Binomial Negativa) ──
@@ -194,32 +195,32 @@ export function calcularQuarterKelly(prob, oddCasa) {
 }
 
 export function sinalPoisson(prob) {
-  if (prob >= 0.75) return { label: "FORTE OVER", color: "green" };
-  if (prob >= 0.65) return { label: "OVER", color: "yellow" };
-  if (prob <= 0.25) return { label: "FORTE UNDER", color: "red" };
-  if (prob <= 0.35) return { label: "UNDER", color: "gray" };
+  if (prob >= 0.65) return { label: "FORTE OVER", color: "green" };
+  if (prob >= 0.55) return { label: "OVER", color: "yellow" };
+  if (prob <= 0.35) return { label: "FORTE UNDER", color: "red" };
+  if (prob <= 0.45) return { label: "UNDER", color: "gray" };
   return { label: "NEUTRO", color: "gray" };
 }
 
 export function sinalPoissonGols(prob) {
-  if (prob >= 0.78) return { label: "FORTE OVER", color: "green" };
-  if (prob >= 0.70) return { label: "OVER", color: "yellow" };
-  if (prob <= 0.22) return { label: "FORTE UNDER", color: "red" };
-  if (prob <= 0.32) return { label: "UNDER", color: "gray" };
+  if (prob >= 0.68) return { label: "FORTE OVER", color: "green" };
+  if (prob >= 0.55) return { label: "OVER", color: "yellow" };
+  if (prob <= 0.32) return { label: "FORTE UNDER", color: "red" };
+  if (prob <= 0.45) return { label: "UNDER", color: "gray" };
   return { label: "NEUTRO", color: "gray" };
 }
 
 export function sinalBTTS(p) {
-  if (p >= 0.70) return { label: "FORTE OVER", color: "green" };
-  if (p >= 0.60) return { label: "OVER", color: "yellow" };
-  if (p <= 0.30) return { label: "FORTE UNDER", color: "red" };
-  if (p <= 0.40) return { label: "UNDER", color: "gray" };
+  if (p >= 0.60) return { label: "FORTE OVER", color: "green" };
+  if (p >= 0.52) return { label: "OVER", color: "yellow" };
+  if (p <= 0.38) return { label: "FORTE UNDER", color: "red" };
+  if (p <= 0.48) return { label: "UNDER", color: "gray" };
   return { label: "NEUTRO", color: "gray" };
 }
 
 // ── Market 1: Corners ──
 export function calcCorners(atk, def_, isHome = false) {
-  const base = ancora(g(atk, "corners"), g(def_, "corners", "c"));
+  const base = ancora(g(atk, "corners"), g(def_, "corners", "c")) * 0.90;
 
   const ofensivos = {
     shots_on_target:   [0.25, indice(g(atk, "shots_on_target"),   g(def_, "shots_on_target",   "c"))],
@@ -238,10 +239,12 @@ export function calcCorners(atk, def_, isHome = false) {
 
   const io = pesosDinamicos(ofensivos);
   const id_ = pesosDinamicos(defensivos);
-  const ic = 0.60 * io + 0.40 * id_;
+  const ic = 0.50 * io + 0.50 * id_;
   let xc = base * ic;
   if (isHome) {
-    xc *= 1.12;
+    xc *= 1.03;
+  } else {
+    xc *= 0.97;
   }
 
   return {
@@ -251,12 +254,6 @@ export function calcCorners(atk, def_, isHome = false) {
       indice_ofensivo: Math.round(io * 10000) / 10000,
       indice_defensivo: Math.round(id_ * 10000) / 10000,
       indice_composto: Math.round(ic * 10000) / 10000,
-      detalhes_of: Object.fromEntries(
-        Object.entries(ofensivos).map(([k, [p, v]]) => [k, [p, Math.round(v * 1000) / 1000]])
-      ),
-      detalhes_def: Object.fromEntries(
-        Object.entries(defensivos).map(([k, [p, v]]) => [k, [p, Math.round(v * 1000) / 1000]])
-      ),
     },
   };
 }
@@ -282,12 +279,12 @@ export function calcGols(atk, def_, isHome = false) {
 
   const io = pesosDinamicos(ofensivos);
   const id_ = pesosDinamicos(defensivos);
-  const ic = 0.55 * io + 0.45 * id_;
+  const ic = 0.50 * io + 0.50 * id_;
   let xg = base * ic;
   if (isHome) {
-    xg *= 1.06;
+    xg *= 1.03;
   } else {
-    xg *= 0.94;
+    xg *= 0.97;
   }
 
   return {
@@ -298,7 +295,7 @@ export function calcGols(atk, def_, isHome = false) {
 
 // ── Market 3: Shots on Target ──
 function calcShotsOnTarget(atk, def_, isHome = false) {
-  const base = ancora(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c"));
+  const base = ancora(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c")) * 0.92;
 
   const ofensivos = {
     shots_in_box:       [0.40, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],
@@ -314,12 +311,12 @@ function calcShotsOnTarget(atk, def_, isHome = false) {
 
   const io = pesosDinamicos(ofensivos);
   const id_ = pesosDinamicos(defensivos);
-  const ic = 0.60 * io + 0.40 * id_;
+  const ic = 0.50 * io + 0.50 * id_;
   let xs = base * ic;
   if (isHome) {
-    xs *= 1.04;
+    xs *= 1.02;
   } else {
-    xs *= 0.96;
+    xs *= 0.98;
   }
 
   return {
@@ -328,26 +325,11 @@ function calcShotsOnTarget(atk, def_, isHome = false) {
   };
 }
 
-// ── Market 4: BTTS ──
-function calcBTTS(statsCasa, statsFora) {
-  const xgC = calcGols(statsCasa, statsFora, true).value;
-  const xgF = calcGols(statsFora, statsCasa, false).value;
-
-  const pH = 1 - Math.exp(-xgC);
-  const pA = 1 - Math.exp(-xgF);
-
-  return {
-    p_btts: Math.round(pH * pA * 10000) / 10000,
-    p_casa_marca: Math.round(pH * 10000) / 10000,
-    p_fora_marca: Math.round(pA * 10000) / 10000,
-  };
-}
-
-// ── Market 5: Cards ──
+// ── Market 4: Cards ──
 function calcCartoes(atk, def_, isHome = false) {
   const baseMedia = ancora(g(atk, "cards"), g(def_, "cards", "c"));
   const baseMax = Math.max(g(atk, "cards"), g(def_, "cards", "c"));
-  const base = baseMedia * 0.80 + baseMax * 0.20;
+  const base = (baseMedia * 0.85 + baseMax * 0.15) * 0.90;
 
   const fatores = {
     yellow_hist:   [0.35, indice(g(atk, "yellow_cards"), Math.max(g(def_, "yellow_cards", "c"), 0.01))],
@@ -359,7 +341,7 @@ function calcCartoes(atk, def_, isHome = false) {
   const ic = pesosDinamicos(fatores);
   let xc = base * ic;
   if (isHome) {
-    xc *= 0.95;
+    xc *= 0.97;
   }
 
   return {
@@ -368,11 +350,9 @@ function calcCartoes(atk, def_, isHome = false) {
   };
 }
 
-// ── Market 6: Faltas ──
+// ── Market 5: Faltas ──
 function calcFaltas(atk, def_) {
-  const baseRaw = ancora(g(atk, "fouls"), g(def_, "fouls", "c"));
-  const mult = baseRaw < 18 ? 1.20 : baseRaw < 22 ? 1.12 : 1.05;
-  const base = baseRaw * mult;
+  const base = ancora(g(atk, "fouls"), g(def_, "fouls", "c")) * 1.55;
   const fatores = {
     fouls:         [0.40, indice(g(atk, "fouls"),         g(def_, "fouls",         "c"))],
     tackles:       [0.30, indice(g(atk, "tackles"),       g(def_, "tackles",       "c"))],
@@ -386,9 +366,9 @@ function calcFaltas(atk, def_) {
   };
 }
 
-// ── Market 7: Defesas do Goleiro ──
+// ── Market 6: Defesas do Goleiro ──
 function calcSaves(atk, def_) {
-  const base = ancora(g(def_, "gk_saves", "t"), g(atk, "shots_on_target", "t"));
+  const base = ancora(g(def_, "gk_saves", "t"), g(atk, "shots_on_target", "t") * 0.65) * 0.60;
 
   const fatores = {
     shots_on_target: [0.45, indice(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c"))],
@@ -404,9 +384,9 @@ function calcSaves(atk, def_) {
   };
 }
 
-// ── Market 8: Chutes Totais ──
+// ── Market 7: Chutes Totais ──
 function calcTotalShots(atk, def_, isHome = false) {
-  const base = ancora(g(atk, "total_shots"), g(def_, "total_shots", "c"));
+  const base = ancora(g(atk, "total_shots"), g(def_, "total_shots", "c")) * 0.72;
 
   const fatores = {
     total_shots:     [0.40, indice(g(atk, "total_shots"),     g(def_, "total_shots",     "c"))],
@@ -418,9 +398,9 @@ function calcTotalShots(atk, def_, isHome = false) {
   const ic = pesosDinamicos(fatores);
   let xt = base * ic;
   if (isHome) {
-    xt *= 1.05;
+    xt *= 1.02;
   } else {
-    xt *= 0.95;
+    xt *= 0.98;
   }
   return {
     value: Math.round(xt * 100) / 100,
@@ -450,22 +430,25 @@ export function calcResultado(xgCasa, xgFora) {
     return Math.max(0, tau);
   }
 
+  let totalP = 0;
   for (let i = 0; i <= maxGols; i++) {
     for (let j = 0; j <= maxGols; j++) {
+      const pmfI = poissonPMF(i, xgCasa);
+      const pmfJ = poissonPMF(j, xgFora);
       const tau = dixonColesTau(i, j, xgCasa, xgFora);
-      const p = poissonPMF(i, xgCasa) * poissonPMF(j, xgFora) * tau;
-      const probVal = Math.max(0, p);
-      placares.push({ home: i, away: j, prob: probVal });
+      const probScore = pmfI * pmfJ * tau;
 
-      if (i > j) pCasa += probVal;
-      else if (i === j) pEmpate += probVal;
-      else pFora += probVal;
+      totalP += probScore;
+      placares.push({ home: i, away: j, prob: probScore });
 
-      if (i > 0 && j > 0) pBTTS += probVal;
+      if (i > j) pCasa += probScore;
+      else if (i === j) pEmpate += probScore;
+      else pFora += probScore;
+
+      if (i >= 1 && j >= 1) pBTTS += probScore;
     }
   }
 
-  const totalP = pCasa + pEmpate + pFora;
   if (totalP > 0) {
     pCasa /= totalP;
     pEmpate /= totalP;
@@ -475,27 +458,28 @@ export function calcResultado(xgCasa, xgFora) {
 
   placares.sort((a, b) => b.prob - a.prob);
 
-  let resultadoEstrito = "Vitória Casa";
-  let probVencedora = pCasa;
+  const dnbHome = pCasa / (pCasa + pFora || 1);
+  const dnbAway = pFora / (pCasa + pFora || 1);
 
-  if (pEmpate > pCasa && pEmpate > pFora) {
-    resultadoEstrito = "Empate";
-    probVencedora = pEmpate;
+  let ahMinus15Home = 0;
+  let ahMinus15Away = 0;
+  placares.forEach(p => {
+    if (p.home - p.away >= 2) ahMinus15Home += p.prob / (totalP || 1);
+    if (p.away - p.home >= 2) ahMinus15Away += p.prob / (totalP || 1);
+  });
+
+  let resultadoEstrito = "Empate";
+  let probVencedora = pEmpate;
+
+  if (pCasa > pEmpate && pCasa > pFora) {
+    resultadoEstrito = "Vitória Casa";
+    probVencedora = pCasa;
   } else if (pFora > pCasa && pFora > pEmpate) {
     resultadoEstrito = "Vitória Fora";
     probVencedora = pFora;
-  } else {
-    resultadoEstrito = "Vitória Casa";
-    probVencedora = pCasa;
   }
 
-  const oddMinima = Math.max(1.01, Math.round((1 / probVencedora) * 100) / 100);
-
-  // Derivação de Handicaps Asiáticos e Draw No Bet (DNB)
-  const dnbHome = pCasa / (pCasa + pFora || 1);
-  const dnbAway = pFora / (pCasa + pFora || 1);
-  const ahMinus15Home = placares.filter(p => p.home - p.away >= 2).reduce((s, p) => s + p.prob, 0) / (totalP || 1);
-  const ahMinus15Away = placares.filter(p => p.away - p.home >= 2).reduce((s, p) => s + p.prob, 0) / (totalP || 1);
+  const oddMinima = probVencedora > 0 ? (1 / probVencedora).toFixed(2) : "—";
 
   return {
     p_casa_vence: Math.round(pCasa * 10000) / 10000,
@@ -520,7 +504,114 @@ export function calcResultado(xgCasa, xgFora) {
   };
 }
 
-// ── Full match analysis (100% Autônomo sem FootyStats - V2 Engine) ──
+// ── AVALIAÇÃO DE PALPITE EXPLÍCITO (GREEN / RED) PARA TODOS OS MERCADOS ──
+export function avaliarPalpiteExplicit(mercadoKey, palpiteObj, realResults) {
+  if (!realResults || Object.keys(realResults).length === 0) {
+    return { status: "PENDENTE", isGreen: null };
+  }
+
+  const rr = realResults;
+  let isGreen = false;
+
+  switch (mercadoKey) {
+    case "1x2": {
+      const gh = Number(rr.goals_home ?? rr.real_goals_home);
+      const ga = Number(rr.goals_away ?? rr.real_goals_away);
+      if (isNaN(gh) || isNaN(ga)) return { status: "PENDENTE", isGreen: null };
+      const pred = palpiteObj.palpite || palpiteObj.resultado;
+      if (pred === "Vitória Casa" || pred?.startsWith("Vitória Mandante")) isGreen = gh > ga;
+      else if (pred === "Vitória Fora" || pred?.startsWith("Vitória Visitante")) isGreen = ga > gh;
+      else if (pred === "Empate") isGreen = gh === ga;
+      break;
+    }
+    case "gols_total": {
+      const real = Number(rr.goals_total ?? rr.real_goals_total);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "gols_casa": {
+      const real = Number(rr.goals_home ?? rr.real_goals_home);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "gols_fora": {
+      const real = Number(rr.goals_away ?? rr.real_goals_away);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "corners_total": {
+      const real = Number(rr.corners_total ?? rr.real_corners_total);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "corners_casa": {
+      const real = Number(rr.corners_home ?? rr.real_corners_home);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "corners_fora": {
+      const real = Number(rr.corners_away ?? rr.real_corners_away);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "shots_total": {
+      const real = Number(rr.shots_total ?? rr.real_shots_total);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "cards_total": {
+      const real = Number(rr.cards_total ?? rr.real_cards_total);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "fouls_total": {
+      const real = Number(rr.fouls_total ?? rr.real_fouls_total);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "saves_total": {
+      const real = Number(rr.saves_total ?? rr.real_saves_total);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "totalshots_total": {
+      const real = Number(rr.totalshots_total ?? rr.real_totalshots_total);
+      if (isNaN(real)) return { status: "PENDENTE", isGreen: null };
+      isGreen = real > palpiteObj.linha;
+      break;
+    }
+    case "btts": {
+      const realBTTS = Number(rr.btts ?? rr.real_btts);
+      const gh = Number(rr.goals_home ?? rr.real_goals_home);
+      const ga = Number(rr.goals_away ?? rr.real_goals_away);
+      let isBothScored = realBTTS === 1;
+      if (isNaN(realBTTS) && !isNaN(gh) && !isNaN(ga)) {
+        isBothScored = gh > 0 && ga > 0;
+      }
+      isGreen = palpiteObj.palpite?.includes("SIM") ? isBothScored : !isBothScored;
+      break;
+    }
+    default:
+      return { status: "PENDENTE", isGreen: null };
+  }
+
+  return {
+    status: isGreen ? "GREEN" : "RED",
+    isGreen,
+  };
+}
+
+// ── Full match analysis (100% Autônomo com Palpites Explícitos para TODOS os mercados) ──
 export function analisarJogo(statsCasa, statsFora) {
   const corners_casa = calcCorners(statsCasa, statsFora, true);
   const corners_fora = calcCorners(statsFora, statsCasa, false);
@@ -551,6 +642,97 @@ export function analisarJogo(statsCasa, statsFora) {
   const xfouls_total = Math.round((faltas_casa.value + faltas_fora.value) * 100) / 100;
   const xsaves_total = Math.round((saves_casa.value + saves_fora.value) * 100) / 100;
   const xtotalshots_total = Math.round((total_shots_casa.value + total_shots_fora.value) * 100) / 100;
+
+  // GERAÇÃO DE PALPITES EXPLÍCITOS PARA CADA UM DOS MERCADOS
+  const picks_explicitos = {
+    pick_1x2: {
+      palpite: resultado.pick_1x2.resultado,
+      prob: resultado.pick_1x2.prob,
+      odd_justa: resultado.pick_1x2.odd_minima,
+    },
+    gols_total: {
+      palpite: `Over ${Math.floor(xg_total) + 0.5} Gols`,
+      linha: Math.floor(xg_total) + 0.5,
+      proj: xg_total,
+      prob: poissonOver(xg_total, Math.floor(xg_total) + 0.5),
+      odd_justa: (1 / Math.max(0.01, poissonOver(xg_total, Math.floor(xg_total) + 0.5))).toFixed(2),
+    },
+    gols_casa: {
+      palpite: `Over ${Math.floor(gols_casa.value) + 0.5} Gols Mandante`,
+      linha: Math.floor(gols_casa.value) + 0.5,
+      proj: gols_casa.value,
+      prob: poissonOver(gols_casa.value, Math.floor(gols_casa.value) + 0.5),
+      odd_justa: (1 / Math.max(0.01, poissonOver(gols_casa.value, Math.floor(gols_casa.value) + 0.5))).toFixed(2),
+    },
+    gols_fora: {
+      palpite: `Over ${Math.floor(gols_fora.value) + 0.5} Gols Visitante`,
+      linha: Math.floor(gols_fora.value) + 0.5,
+      proj: gols_fora.value,
+      prob: poissonOver(gols_fora.value, Math.floor(gols_fora.value) + 0.5),
+      odd_justa: (1 / Math.max(0.01, poissonOver(gols_fora.value, Math.floor(gols_fora.value) + 0.5))).toFixed(2),
+    },
+    corners_total: {
+      palpite: `Over ${Math.floor(xc_total) + 0.5} Escanteios`,
+      linha: Math.floor(xc_total) + 0.5,
+      proj: xc_total,
+      prob: poissonOver(xc_total, Math.floor(xc_total) + 0.5),
+      odd_justa: (1 / Math.max(0.01, poissonOver(xc_total, Math.floor(xc_total) + 0.5))).toFixed(2),
+    },
+    corners_casa: {
+      palpite: `Over ${Math.floor(corners_casa.value) + 0.5} Escanteios Mandante`,
+      linha: Math.floor(corners_casa.value) + 0.5,
+      proj: corners_casa.value,
+      prob: poissonOver(corners_casa.value, Math.floor(corners_casa.value) + 0.5),
+      odd_justa: (1 / Math.max(0.01, poissonOver(corners_casa.value, Math.floor(corners_casa.value) + 0.5))).toFixed(2),
+    },
+    corners_fora: {
+      palpite: `Over ${Math.floor(corners_fora.value) + 0.5} Escanteios Visitante`,
+      linha: Math.floor(corners_fora.value) + 0.5,
+      proj: corners_fora.value,
+      prob: poissonOver(corners_fora.value, Math.floor(corners_fora.value) + 0.5),
+      odd_justa: (1 / Math.max(0.01, poissonOver(corners_fora.value, Math.floor(corners_fora.value) + 0.5))).toFixed(2),
+    },
+    shots_total: {
+      palpite: `Over ${Math.floor(xs_total) + 0.5} Chutes no Gol`,
+      linha: Math.floor(xs_total) + 0.5,
+      proj: xs_total,
+      prob: poissonOver(xs_total, Math.floor(xs_total) + 0.5),
+      odd_justa: (1 / Math.max(0.01, poissonOver(xs_total, Math.floor(xs_total) + 0.5))).toFixed(2),
+    },
+    cards_total: {
+      palpite: `Over ${Math.floor(xcard_total) + 0.5} Cartões`,
+      linha: Math.floor(xcard_total) + 0.5,
+      proj: xcard_total,
+      prob: negativeBinomialOver(xcard_total, Math.floor(xcard_total) + 0.5, 4.0),
+      odd_justa: (1 / Math.max(0.01, negativeBinomialOver(xcard_total, Math.floor(xcard_total) + 0.5, 4.0))).toFixed(2),
+    },
+    fouls_total: {
+      palpite: `Over ${Math.floor(xfouls_total) + 0.5} Faltas`,
+      linha: Math.floor(xfouls_total) + 0.5,
+      proj: xfouls_total,
+      prob: negativeBinomialOver(xfouls_total, Math.floor(xfouls_total) + 0.5, 12.0),
+      odd_justa: (1 / Math.max(0.01, negativeBinomialOver(xfouls_total, Math.floor(xfouls_total) + 0.5, 12.0))).toFixed(2),
+    },
+    saves_total: {
+      palpite: `Over ${Math.floor(xsaves_total) + 0.5} Defesas Goleiro`,
+      linha: Math.floor(xsaves_total) + 0.5,
+      proj: xsaves_total,
+      prob: poissonOver(xsaves_total, Math.floor(xsaves_total) + 0.5),
+      odd_justa: (1 / Math.max(0.01, poissonOver(xsaves_total, Math.floor(xsaves_total) + 0.5))).toFixed(2),
+    },
+    totalshots_total: {
+      palpite: `Over ${Math.floor(xtotalshots_total) + 0.5} Chutes Totais`,
+      linha: Math.floor(xtotalshots_total) + 0.5,
+      proj: xtotalshots_total,
+      prob: poissonOver(xtotalshots_total, Math.floor(xtotalshots_total) + 0.5),
+      odd_justa: (1 / Math.max(0.01, poissonOver(xtotalshots_total, Math.floor(xtotalshots_total) + 0.5))).toFixed(2),
+    },
+    btts: {
+      palpite: resultado.p_btts >= 0.50 ? "Ambas Marcam: SIM" : "Ambas Marcam: NÃO",
+      prob: resultado.p_btts,
+      odd_justa: resultado.p_btts > 0 ? (1 / resultado.p_btts).toFixed(2) : "—",
+    },
+  };
 
   return {
     xg_casa: gols_casa.value,
@@ -591,6 +773,7 @@ export function analisarJogo(statsCasa, statsFora) {
     pick_1x2:     resultado.pick_1x2,
     placares_top5: resultado.placares_top5,
     handicaps:    resultado.handicaps,
+    picks_explicitos,
 
     p_btts:       resultado.p_btts,
     db: {

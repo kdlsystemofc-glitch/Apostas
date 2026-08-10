@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { poissonOver, sinalPoisson, calcularQuarterKelly } from "@/lib/predictionEngine";
 import { useBankrollStore } from "@/store/useBankrollStore";
+import { CheckCircle2, XCircle } from "lucide-react";
 import SignalBadge from "./SignalBadge";
 
-export default function MarketBlock({ icon, title, homeName, awayName, xHome, xAway, xTotal, lines, sinalFn, warning }) {
+export default function MarketBlock({ icon, title, homeName, awayName, xHome, xAway, xTotal, lines, sinalFn, warning, realValue }) {
   const [bookieOdd, setBookieOdd] = useState("");
   const { calculateStakeAmount } = useBankrollStore();
   const useSinal = sinalFn || sinalPoisson;
@@ -16,6 +17,11 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
   const bestProb = closestLine != null ? poissonOver(xTotal, closestLine) : 0;
   const fairOdd = bestProb > 0 ? Math.max(1.01, Math.round((1 / bestProb) * 100) / 100) : "—";
   const bestSignal = useSinal(bestProb);
+
+  // Avaliação GREEN / RED com base no valor real
+  const realValNum = realValue !== undefined && realValue !== null && realValue !== "" ? Number(realValue) : null;
+  const hasReal = realValNum !== null && !isNaN(realValNum);
+  const isGreen = hasReal && closestLine != null ? realValNum > closestLine : null;
 
   const kelly = calcularQuarterKelly(bestProb, bookieOdd);
   const oddNum = parseFloat(bookieOdd);
@@ -30,11 +36,23 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
           <span className="text-lg flex-shrink-0">{icon}</span>
           <h3 className="font-semibold tracking-tight text-sm sm:text-base truncate text-slate-100">{title}</h3>
         </div>
-        {closestLine != null && (
-          <span className="text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 px-2.5 py-1 rounded-full">
-            Linha Base: Over {closestLine}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {hasReal && (
+            <span className={`text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md ${
+              isGreen
+                ? "bg-emerald-600 text-white border border-emerald-400"
+                : "bg-rose-600 text-white border border-rose-400"
+            }`}>
+              {isGreen ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+              {isGreen ? `GREEN (${realValNum})` : `RED (${realValNum})`}
+            </span>
+          )}
+          {closestLine != null && (
+            <span className="text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 px-2.5 py-1 rounded-full">
+              Linha Base: Over {closestLine}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="divide-y divide-slate-800/60">
@@ -56,11 +74,26 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
 
         {/* Highlight da Recomendação da Linha de Valor */}
         {closestLine != null && (
-          <div className="p-4 bg-slate-950/90 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-y border-slate-800">
+          <div className={`p-4 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-y transition-all ${
+            !hasReal
+              ? "bg-slate-950/90 border-slate-800"
+              : isGreen
+              ? "bg-emerald-950/30 border-emerald-500/50 shadow-lg shadow-emerald-500/10"
+              : "bg-rose-950/30 border-rose-500/50 shadow-lg shadow-rose-500/10"
+          }`}>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-blue-400 block mb-0.5">
-                🔥 Linha Comercial Recomendada
-              </span>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-blue-400 block">
+                  🔥 Palpite Assumido pelo Sistema
+                </span>
+                {hasReal && (
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border uppercase ${
+                    isGreen ? "bg-emerald-950 text-emerald-300 border-emerald-500" : "bg-rose-950 text-rose-300 border-rose-500"
+                  }`}>
+                    {isGreen ? `✓ GREEN (Real: ${realValNum})` : `✗ RED (Real: ${realValNum})`}
+                  </span>
+                )}
+              </div>
               <p className="text-base font-extrabold text-white">
                 Over {closestLine} {title}
               </p>
@@ -120,6 +153,7 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
               const lineFairOdd = prob > 0 ? Math.max(1.01, Math.round((1 / prob) * 100) / 100) : "—";
               const sinal = useSinal(prob);
               const isClosest = line === closestLine;
+              const lineIsGreen = hasReal ? realValNum > line : null;
 
               return (
                 <div
@@ -135,6 +169,13 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
                     {isClosest && (
                       <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase">
                         Principal
+                      </span>
+                    )}
+                    {hasReal && (
+                      <span className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded border ${
+                        lineIsGreen ? "bg-emerald-950 text-emerald-400 border-emerald-600" : "bg-rose-950 text-rose-400 border-rose-600"
+                      }`}>
+                        {lineIsGreen ? "GREEN" : "RED"}
                       </span>
                     )}
                   </div>
