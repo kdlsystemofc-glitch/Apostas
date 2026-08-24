@@ -1,6 +1,8 @@
 // ══════════════════════════════════════════════════════════════
-// PREDICTION ENGINE V2.2 — MOTOR AUTÔNOMO COM PARSER CORRIGIDO E LINHAS COMERCIAIS UNIFICADAS
+// PREDICTION ENGINE V2.3 — MOTOR AUTÔNOMO COM CAMADA DE RECALIBRAÇÃO ESTATÍSTICA (OLS)
 // ══════════════════════════════════════════════════════════════
+
+import { aplicarCalibracao } from "./calibrationLayer";
 
 const STAT_MAP = {
   "Goals": "goals",
@@ -63,9 +65,6 @@ export function parseStatsHubText(text) {
       console.warn("Linha de médias com menos de 3 números:", line);
       return null;
     }
-    // numbers[0] = média total (soma dos dois times) — DESCARTAR
-    // numbers[1] = média do time (t) — usar
-    // numbers[2] = média cedida (c) — usar
     return {
       t: parseFloat(numbers[1]),
       c: parseFloat(numbers[2]),
@@ -245,7 +244,8 @@ export function calcCorners(atk, def_, isHome = false) {
   const io = pesosDinamicos(ofensivos);
   const id_ = pesosDinamicos(defensivos);
   const ic = 0.50 * io + 0.50 * id_;
-  let xc = base * ic;
+  const raw = base * ic;
+  let xc = raw;
   if (isHome) {
     xc *= 1.03;
   } else {
@@ -254,6 +254,7 @@ export function calcCorners(atk, def_, isHome = false) {
 
   return {
     value: Math.round(xc * 100) / 100,
+    value_raw: Math.round(raw * 100) / 100,
     details: {
       base: Math.round(base * 1000) / 1000,
       indice_ofensivo: Math.round(io * 10000) / 10000,
@@ -285,7 +286,8 @@ export function calcGols(atk, def_, isHome = false) {
   const io = pesosDinamicos(ofensivos);
   const id_ = pesosDinamicos(defensivos);
   const ic = 0.50 * io + 0.50 * id_;
-  let xg = base * ic;
+  const raw = base * ic;
+  let xg = raw;
   if (isHome) {
     xg *= 1.03;
   } else {
@@ -294,12 +296,13 @@ export function calcGols(atk, def_, isHome = false) {
 
   return {
     value: Math.round(xg * 100) / 100,
+    value_raw: Math.round(raw * 100) / 100,
     details: { base: Math.round(base * 1000) / 1000, io: Math.round(io * 10000) / 10000, id: Math.round(id_ * 10000) / 10000 },
   };
 }
 
 // ── Market 3: Shots on Target ──
-function calcShotsOnTarget(atk, def_, isHome = false) {
+export function calcShotsOnTarget(atk, def_, isHome = false) {
   const base = ancora(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c"));
 
   const ofensivos = {
@@ -317,7 +320,8 @@ function calcShotsOnTarget(atk, def_, isHome = false) {
   const io = pesosDinamicos(ofensivos);
   const id_ = pesosDinamicos(defensivos);
   const ic = 0.50 * io + 0.50 * id_;
-  let xs = base * ic;
+  const raw = base * ic;
+  let xs = raw;
   if (isHome) {
     xs *= 1.02;
   } else {
@@ -326,12 +330,13 @@ function calcShotsOnTarget(atk, def_, isHome = false) {
 
   return {
     value: Math.round(xs * 100) / 100,
+    value_raw: Math.round(raw * 100) / 100,
     details: { base: Math.round(base * 1000) / 1000, ic: Math.round(ic * 10000) / 10000 },
   };
 }
 
 // ── Market 4: Cards ──
-function calcCartoes(atk, def_, isHome = false) {
+export function calcCartoes(atk, def_, isHome = false) {
   const baseMedia = ancora(g(atk, "cards"), g(def_, "cards", "c"));
   const baseMax = Math.max(g(atk, "cards"), g(def_, "cards", "c"));
   const base = baseMedia * 0.85 + baseMax * 0.15;
@@ -344,19 +349,21 @@ function calcCartoes(atk, def_, isHome = false) {
   };
 
   const ic = pesosDinamicos(fatores);
-  let xc = base * ic;
+  const raw = base * ic;
+  let xc = raw;
   if (isHome) {
     xc *= 0.97;
   }
 
   return {
     value: Math.round(xc * 100) / 100,
+    value_raw: Math.round(raw * 100) / 100,
     details: { base: Math.round(base * 1000) / 1000, ic: Math.round(ic * 10000) / 10000 },
   };
 }
 
 // ── Market 5: Faltas ──
-function calcFaltas(atk, def_) {
+export function calcFaltas(atk, def_) {
   const base = ancora(g(atk, "fouls"), g(def_, "fouls", "c"));
   const fatores = {
     fouls:         [0.40, indice(g(atk, "fouls"),         g(def_, "fouls",         "c"))],
@@ -365,14 +372,16 @@ function calcFaltas(atk, def_) {
     dispossessed:  [0.10, indice(g(atk, "dispossessed"),  g(def_, "dispossessed",  "c"))],
   };
   const ic = pesosDinamicos(fatores);
+  const raw = base * ic;
   return {
-    value: Math.round(base * ic * 100) / 100,
+    value: Math.round(raw * 100) / 100,
+    value_raw: Math.round(raw * 100) / 100,
     details: { base: Math.round(base * 1000) / 1000, ic: Math.round(ic * 10000) / 10000 },
   };
 }
 
 // ── Market 6: Defesas do Goleiro ──
-function calcSaves(atk, def_) {
+export function calcSaves(atk, def_) {
   const base = ancora(g(def_, "gk_saves", "t"), g(atk, "shots_on_target", "c"));
 
   const fatores = {
@@ -383,14 +392,16 @@ function calcSaves(atk, def_) {
   };
 
   const ic = pesosDinamicos(fatores);
+  const raw = base * ic;
   return {
-    value: Math.round(base * ic * 100) / 100,
+    value: Math.round(raw * 100) / 100,
+    value_raw: Math.round(raw * 100) / 100,
     details: { base: Math.round(base * 1000) / 1000, ic: Math.round(ic * 10000) / 10000 },
   };
 }
 
 // ── Market 7: Chutes Totais ──
-function calcTotalShots(atk, def_, isHome = false) {
+export function calcTotalShots(atk, def_, isHome = false) {
   const base = ancora(g(atk, "total_shots"), g(def_, "total_shots", "c"));
 
   const fatores = {
@@ -401,7 +412,8 @@ function calcTotalShots(atk, def_, isHome = false) {
   };
 
   const ic = pesosDinamicos(fatores);
-  let xt = base * ic;
+  const raw = base * ic;
+  let xt = raw;
   if (isHome) {
     xt *= 1.02;
   } else {
@@ -409,6 +421,7 @@ function calcTotalShots(atk, def_, isHome = false) {
   }
   return {
     value: Math.round(xt * 100) / 100,
+    value_raw: Math.round(raw * 100) / 100,
     details: { base: Math.round(base * 1000) / 1000, ic: Math.round(ic * 10000) / 10000 },
   };
 }
@@ -629,45 +642,79 @@ export function melhorLinhaComercial(valor, linhasDisponiveis, probFn = poissonO
   return melhor;
 }
 
-// ── Full match analysis (100% Autônomo com Palpites Explícitos para TODOS os mercados) ──
+// ── Full match analysis (100% Autônomo com Recalibração OLS e Palpites Explícitos) ──
 export function analisarJogo(statsCasa, statsFora) {
   const corners_casa = calcCorners(statsCasa, statsFora, true);
   const corners_fora = calcCorners(statsFora, statsCasa, false);
   const gols_casa = calcGols(statsCasa, statsFora, true);
   const gols_fora = calcGols(statsFora, statsCasa, false);
-
-  const resultado = calcResultado(gols_casa.value, gols_fora.value);
-
   const shots_casa = calcShotsOnTarget(statsCasa, statsFora, true);
   const shots_fora = calcShotsOnTarget(statsFora, statsCasa, false);
-
   const cartoes_casa = calcCartoes(statsCasa, statsFora, true);
   const cartoes_fora = calcCartoes(statsFora, statsCasa, false);
-
   const faltas_casa = calcFaltas(statsCasa, statsFora);
   const faltas_fora = calcFaltas(statsFora, statsCasa);
-
   const saves_casa = calcSaves(statsCasa, statsFora);
   const saves_fora = calcSaves(statsFora, statsCasa);
-
   const total_shots_casa = calcTotalShots(statsCasa, statsFora, true);
   const total_shots_fora = calcTotalShots(statsFora, statsCasa, false);
 
-  const xg_total = Math.round((gols_casa.value + gols_fora.value) * 100) / 100;
-  const xc_total = Math.round((corners_casa.value + corners_fora.value) * 100) / 100;
-  const xs_total = Math.round((shots_casa.value + shots_fora.value) * 100) / 100;
-  const xcard_total = Math.round((cartoes_casa.value + cartoes_fora.value) * 100) / 100;
-  const xfouls_total = Math.round((faltas_casa.value + faltas_fora.value) * 100) / 100;
-  const xsaves_total = Math.round((saves_casa.value + saves_fora.value) * 100) / 100;
-  const xtotalshots_total = Math.round((total_shots_casa.value + total_shots_fora.value) * 100) / 100;
+  // Camada 1 (Mecanística): Valores Brutos Somados Sem Ajustes
+  const xc_total_bruto = Math.round(((corners_casa.value_raw || corners_casa.value) + (corners_fora.value_raw || corners_fora.value)) * 100) / 100;
+  const xg_total_bruto = Math.round(((gols_casa.value_raw || gols_casa.value) + (gols_fora.value_raw || gols_fora.value)) * 100) / 100;
+  const xs_total_bruto = Math.round(((shots_casa.value_raw || shots_casa.value) + (shots_fora.value_raw || shots_fora.value)) * 100) / 100;
+  const xcard_total_bruto = Math.round(((cartoes_casa.value_raw || cartoes_casa.value) + (cartoes_fora.value_raw || cartoes_fora.value)) * 100) / 100;
+  const xfouls_total_bruto = Math.round(((faltas_casa.value_raw || faltas_casa.value) + (faltas_fora.value_raw || faltas_fora.value)) * 100) / 100;
+  const xsaves_total_bruto = Math.round(((saves_casa.value_raw || saves_casa.value) + (saves_fora.value_raw || saves_fora.value)) * 100) / 100;
+  const xtotalshots_total_bruto = Math.round(((total_shots_casa.value_raw || total_shots_casa.value) + (total_shots_fora.value_raw || total_shots_fora.value)) * 100) / 100;
+
+  // Camada 2 (Estatística): Recalibração OLS sobre o modelo mecanístico
+  const xc_total = aplicarCalibracao(xc_total_bruto, "corners_total");
+  const xg_total = aplicarCalibracao(xg_total_bruto, "goals_total");
+  const xs_total = aplicarCalibracao(xs_total_bruto, "shots_on_target");
+  const xcard_total = aplicarCalibracao(xcard_total_bruto, "cards_total");
+  const xfouls_total = aplicarCalibracao(xfouls_total_bruto, "fouls_total");
+  const xsaves_total = aplicarCalibracao(xsaves_total_bruto, "saves_total");
+  const xtotalshots_total = aplicarCalibracao(xtotalshots_total_bruto, "total_shots");
+
+  // Redistribuição proporcional mantendo a fração relativa de cada time
+  const ratioCorners = xc_total_bruto > 0 ? xc_total / xc_total_bruto : 1.0;
+  const val_corners_casa = Math.round(corners_casa.value * ratioCorners * 100) / 100;
+  const val_corners_fora = Math.round(corners_fora.value * ratioCorners * 100) / 100;
+
+  const ratioGols = xg_total_bruto > 0 ? xg_total / xg_total_bruto : 1.0;
+  const val_gols_casa = Math.round(gols_casa.value * ratioGols * 100) / 100;
+  const val_gols_fora = Math.round(gols_fora.value * ratioGols * 100) / 100;
+
+  const ratioShots = xs_total_bruto > 0 ? xs_total / xs_total_bruto : 1.0;
+  const val_shots_casa = Math.round(shots_casa.value * ratioShots * 100) / 100;
+  const val_shots_fora = Math.round(shots_fora.value * ratioShots * 100) / 100;
+
+  const ratioCards = xcard_total_bruto > 0 ? xcard_total / xcard_total_bruto : 1.0;
+  const val_cards_casa = Math.round(cartoes_casa.value * ratioCards * 100) / 100;
+  const val_cards_fora = Math.round(cartoes_fora.value * ratioCards * 100) / 100;
+
+  const ratioFouls = xfouls_total_bruto > 0 ? xfouls_total / xfouls_total_bruto : 1.0;
+  const val_faltas_casa = Math.round(faltas_casa.value * ratioFouls * 100) / 100;
+  const val_faltas_fora = Math.round(faltas_fora.value * ratioFouls * 100) / 100;
+
+  const ratioSaves = xsaves_total_bruto > 0 ? xsaves_total / xsaves_total_bruto : 1.0;
+  const val_saves_casa = Math.round(saves_casa.value * ratioSaves * 100) / 100;
+  const val_saves_fora = Math.round(saves_fora.value * ratioSaves * 100) / 100;
+
+  const ratioTotalShots = xtotalshots_total_bruto > 0 ? xtotalshots_total / xtotalshots_total_bruto : 1.0;
+  const val_total_shots_casa = Math.round(total_shots_casa.value * ratioTotalShots * 100) / 100;
+  const val_total_shots_fora = Math.round(total_shots_fora.value * ratioTotalShots * 100) / 100;
+
+  const resultado = calcResultado(val_gols_casa, val_gols_fora);
 
   // Seleção das melhores linhas comerciais padronizadas via COMMERCIAL_LINES
   const melhorGolsTotal = melhorLinhaComercial(xg_total, COMMERCIAL_LINES.goals_total);
-  const melhorGolsCasa = melhorLinhaComercial(gols_casa.value, COMMERCIAL_LINES.goals_team);
-  const melhorGolsFora = melhorLinhaComercial(gols_fora.value, COMMERCIAL_LINES.goals_team);
+  const melhorGolsCasa = melhorLinhaComercial(val_gols_casa, COMMERCIAL_LINES.goals_team);
+  const melhorGolsFora = melhorLinhaComercial(val_gols_fora, COMMERCIAL_LINES.goals_team);
   const melhorCornersTotal = melhorLinhaComercial(xc_total, COMMERCIAL_LINES.corners_total);
-  const melhorCornersCasa = melhorLinhaComercial(corners_casa.value, COMMERCIAL_LINES.corners_team);
-  const melhorCornersFora = melhorLinhaComercial(corners_fora.value, COMMERCIAL_LINES.corners_team);
+  const melhorCornersCasa = melhorLinhaComercial(val_corners_casa, COMMERCIAL_LINES.corners_team);
+  const melhorCornersFora = melhorLinhaComercial(val_corners_fora, COMMERCIAL_LINES.corners_team);
   const melhorShotsTotal = melhorLinhaComercial(xs_total, COMMERCIAL_LINES.shots_target_total);
   const melhorCardsTotal = melhorLinhaComercial(xcard_total, COMMERCIAL_LINES.cards_total, (v, l) => negativeBinomialOver(v, l, 4.0));
   const melhorFoulsTotal = melhorLinhaComercial(xfouls_total, COMMERCIAL_LINES.fouls_total, (v, l) => negativeBinomialOver(v, l, 12.0));
@@ -691,14 +738,14 @@ export function analisarJogo(statsCasa, statsFora) {
     gols_casa: {
       palpite: `Over ${melhorGolsCasa.linha} Gols Mandante`,
       linha: melhorGolsCasa.linha,
-      proj: gols_casa.value,
+      proj: val_gols_casa,
       prob: melhorGolsCasa.prob,
       odd_justa: (1 / Math.max(0.01, melhorGolsCasa.prob)).toFixed(2),
     },
     gols_fora: {
       palpite: `Over ${melhorGolsFora.linha} Gols Visitante`,
       linha: melhorGolsFora.linha,
-      proj: gols_fora.value,
+      proj: val_gols_fora,
       prob: melhorGolsFora.prob,
       odd_justa: (1 / Math.max(0.01, melhorGolsFora.prob)).toFixed(2),
     },
@@ -712,14 +759,14 @@ export function analisarJogo(statsCasa, statsFora) {
     corners_casa: {
       palpite: `Over ${melhorCornersCasa.linha} Escanteios Mandante`,
       linha: melhorCornersCasa.linha,
-      proj: corners_casa.value,
+      proj: val_corners_casa,
       prob: melhorCornersCasa.prob,
       odd_justa: (1 / Math.max(0.01, melhorCornersCasa.prob)).toFixed(2),
     },
     corners_fora: {
       palpite: `Over ${melhorCornersFora.linha} Escanteios Visitante`,
       linha: melhorCornersFora.linha,
-      proj: corners_fora.value,
+      proj: val_corners_fora,
       prob: melhorCornersFora.prob,
       odd_justa: (1 / Math.max(0.01, melhorCornersFora.prob)).toFixed(2),
     },
@@ -766,36 +813,46 @@ export function analisarJogo(statsCasa, statsFora) {
   };
 
   return {
-    xg_casa: gols_casa.value,
-    xg_fora: gols_fora.value,
+    raw_totals: {
+      xg_total_bruto,
+      xc_total_bruto,
+      xs_total_bruto,
+      xcard_total_bruto,
+      xfouls_total_bruto,
+      xsaves_total_bruto,
+      xtotalshots_total_bruto,
+    },
+
+    xg_casa: val_gols_casa,
+    xg_fora: val_gols_fora,
     xg_total,
     gols_details_casa: gols_casa.details,
     gols_details_fora: gols_fora.details,
 
-    xc_casa: corners_casa.value,
-    xc_fora: corners_fora.value,
+    xc_casa: val_corners_casa,
+    xc_fora: val_corners_fora,
     xc_total,
     corners_details_casa: corners_casa.details,
     corners_details_fora: corners_fora.details,
 
-    xs_casa: shots_casa.value,
-    xs_fora: shots_fora.value,
+    xs_casa: val_shots_casa,
+    xs_fora: val_shots_fora,
     xs_total,
 
-    xcard_casa: cartoes_casa.value,
-    xcard_fora: cartoes_fora.value,
+    xcard_casa: val_cards_casa,
+    xcard_fora: val_cards_fora,
     xcard_total,
 
-    xfouls_casa: faltas_casa.value,
-    xfouls_fora: faltas_fora.value,
+    xfouls_casa: val_faltas_casa,
+    xfouls_fora: val_faltas_fora,
     xfouls_total,
 
-    xsaves_casa: saves_casa.value,
-    xsaves_fora: saves_fora.value,
+    xsaves_casa: val_saves_casa,
+    xsaves_fora: val_saves_fora,
     xsaves_total,
 
-    xtotalshots_casa: total_shots_casa.value,
-    xtotalshots_fora: total_shots_fora.value,
+    xtotalshots_casa: val_total_shots_casa,
+    xtotalshots_fora: val_total_shots_fora,
     xtotalshots_total,
 
     p_casa_vence: resultado.p_casa_vence,
@@ -809,8 +866,8 @@ export function analisarJogo(statsCasa, statsFora) {
     p_btts:       resultado.p_btts,
     db: {
       p_btts:       resultado.p_btts,
-      p_casa_marca: Math.round((1 - Math.exp(-gols_casa.value)) * 10000) / 10000,
-      p_fora_marca: Math.round((1 - Math.exp(-gols_fora.value)) * 10000) / 10000,
+      p_casa_marca: Math.round((1 - Math.exp(-val_gols_casa)) * 10000) / 10000,
+      p_fora_marca: Math.round((1 - Math.exp(-val_gols_fora)) * 10000) / 10000,
     },
   };
 }

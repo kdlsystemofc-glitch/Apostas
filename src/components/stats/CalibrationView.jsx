@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { parseStatsHubText, analisarJogo } from "@/lib/predictionEngine";
+import {
+  CALIBRATION_COEFFICIENTS,
+  setCalibrationCoefficients,
+  fitOLS,
+} from "@/lib/calibrationLayer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Download, CheckCircle2 } from "lucide-react";
+import { RefreshCw, Download, Sliders, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 function fixLegacyStats(statsObj) {
@@ -11,7 +16,6 @@ function fixLegacyStats(statsObj) {
   const fixed = {};
   for (const [key, val] of Object.entries(statsObj)) {
     if (val && typeof val === "object" && val.t !== undefined && val.c !== undefined) {
-      // Se t > c e t aparenta ser o total (soma do time + concedido)
       if (val.t > val.c) {
         const teamMade = val.c;
         const conceded = Math.max(0, val.t - val.c);
@@ -112,11 +116,22 @@ const LABELS = {
   btts: "BTTS",
 };
 
+const OLS_MARKETS_MAP = [
+  { key: "corners_total",   name: "Escanteios Total", rawKey: "xc_total_bruto",  homeRealKey: "corners_home", awayRealKey: "corners_away" },
+  { key: "goals_total",     name: "Gols Total",       rawKey: "xg_total_bruto",  homeRealKey: "goals_home",   awayRealKey: "goals_away" },
+  { key: "cards_total",     name: "Cartões Total",    rawKey: "xcard_total_bruto", homeRealKey: "cards_home", awayRealKey: "cards_away" },
+  { key: "shots_on_target", name: "Chutes no Gol",    rawKey: "xs_total_bruto",  homeRealKey: "shots_home",   awayRealKey: "shots_away" },
+  { key: "fouls_total",     name: "Faltas Total",     rawKey: "xfouls_total_bruto", homeRealKey: "fouls_home", awayRealKey: "fouls_away" },
+  { key: "saves_total",     name: "Defesas Goleiro",  rawKey: "xsaves_total_bruto", homeRealKey: "saves_home", awayRealKey: "saves_away" },
+  { key: "total_shots",     name: "Chutes Totais",    rawKey: "xtotalshots_total_bruto", homeRealKey: "totalshots_home", awayRealKey: "totalshots_away" },
+];
+
 export default function CalibrationView() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
   const [progressMsg, setProgressMsg] = useState("");
+  const [olsResults, setOlsResults] = useState(null);
   const { toast } = useToast();
 
   const loadMatches = async () => {
@@ -134,6 +149,60 @@ export default function CalibrationView() {
   useEffect(() => {
     loadMatches();
   }, []);
+
+  const handleFitOLS = () => {
+    const completed = matches.filter(m => m.status === "completed" || m.real_results);
+    if (completed.length < 10) {
+      toast({ title: "Amostra Insuficiente", description: "Necessário pelo menos 10 jogos com resultados reais.", variant: "destructive" });
+      return;
+    }
+
+    const fitted = {};
+    for (const mObj of OLS_MARKETS_MAP) {
+      const pares = [];
+      for (const m of completed) {
+        let homeStats = m.home_stats;
+        let awayStats = m.away_stats;
+        if (typeof m.home_text === "string" && m.home_text.trim().length > 10) {
+          homeStats = parseStatsHubText(m.home_text);
+        } else {
+          homeStats = fixLegacyStats(m.home_stats);
+        }
+        if (typeof m.away_text === "string" && m.away_text.trim().length > 10) {
+          awayStats = parseStatsHubText(m.away_text);
+        } else {
+          awayStats = fixLegacyStats(m.away_stats);
+        }
+
+        const res = analisarJogo(homeStats, awayStats);
+        const rawVal = res.raw_totals?.[mObj.rawKey];
+
+        const rr = m.real_results;
+        const realH = rr?.[mObj.homeRealKey] ?? rr?.[`real_${mObj.homeRealKey}`];
+        const realA = rr?.[mObj.awayRealKey] ?? rr?.[`real_${mObj.awayRealKey}`];
+
+        if (rawVal !== undefined && realH !== undefined && realA !== undefined) {
+          const realTotal = (Number(realH) || 0) + (Number(realA) || 0);
+          pares.push([rawVal, realTotal]);
+        }
+      }
+
+      const coef = fitOLS(pares);
+      if (coef) {
+        fitted[mObj.key] = coef;
+      }
+    }
+
+    setOlsResults(fitted);
+    toast({ title: "Regressão OLS Calculada!", description: `Coeficientes ajustados sobre ${completed.length} partidas.` });
+  };
+
+  const handleApplyOLS = async () => {
+    if (!olsResults) return;
+    setCalibrationCoefficients(olsResults);
+    toast({ title: "Coeficientes Aplicados!", description: "Iniciando recálculo das partidas no banco..." });
+    await handleRecalculateAll();
+  };
 
   const handleRecalculateAll = async () => {
     setRecalculating(true);
@@ -168,7 +237,7 @@ export default function CalibrationView() {
         });
       }
 
-      toast({ title: "Recálculo concluído!", description: `${all.length} jogos recalculados com o parser corrigido.` });
+      toast({ title: "Recálculo concluído!", description: `${all.length} jogos recalculados com sucesso.` });
       await loadMatches();
     } catch (err) {
       toast({ title: "Erro ao recalcular", description: err.message, variant: "destructive" });
@@ -185,6 +254,7 @@ export default function CalibrationView() {
     const reportData = {
       data_exportacao: new Date().toISOString(),
       total_jogos_analisados: completed.length,
+      coeficientes_ols_ativos: CALIBRATION_COEFFICIENTS,
       mercados: overallStats.map(s => ({
         mercado: LABELS[s.key] || s.key,
         amostra_jogos: s.n,
@@ -227,15 +297,22 @@ export default function CalibrationView() {
 
   return (
     <div className="space-y-6 text-white">
-      {/* Botões de Ação Global (Recalcular Todos & Exportar Relatório) */}
+      {/* Botões de Ação Global (Recalcular, Exportar & Ajustar OLS) */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-900/90 rounded-xl border border-slate-800 shadow-xl">
         <div>
-          <h3 className="font-extrabold text-base text-white">Painel de Calibração Estatística V2.2</h3>
+          <h3 className="font-extrabold text-base text-white">Painel de Calibração Estatística V2.3 (OLS)</h3>
           <p className="text-xs text-slate-400 font-semibold mt-0.5">
             Total no banco: {matches.length} jogos ({completed.length} com resultado real)
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={handleFitOLS}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs gap-1.5"
+          >
+            <Sliders className="w-3.5 h-3.5 text-indigo-200" />
+            Ajustar Coeficientes (OLS)
+          </Button>
           <Button
             onClick={handleRecalculateAll}
             disabled={recalculating}
@@ -251,10 +328,64 @@ export default function CalibrationView() {
             className="border-slate-700 bg-slate-950 text-white hover:bg-slate-800 font-extrabold text-xs gap-1.5"
           >
             <Download className="w-3.5 h-3.5 text-emerald-400" />
-            Exportar Relatório de Calibração
+            Exportar Relatório
           </Button>
         </div>
       </div>
+
+      {/* Painel de Resultados do Fit OLS */}
+      {olsResults && (
+        <div className="rounded-xl border border-indigo-500/50 bg-indigo-950/40 p-5 shadow-xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-extrabold text-sm text-indigo-300 flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-indigo-400" />
+                Coeficientes OLS Calculados (y = intercept + slope × raw)
+              </h4>
+              <p className="text-xs text-slate-300 mt-1">
+                Ajustados sobre {completed.length} partidas históricas reais.
+              </p>
+            </div>
+            <Button
+              onClick={handleApplyOLS}
+              disabled={recalculating}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs gap-1.5 shadow-lg shadow-emerald-600/30"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Aplicar e Recalcular Todos
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto border border-slate-800 rounded-lg">
+            <table className="w-full text-xs text-left text-slate-300">
+              <thead className="bg-slate-950 text-slate-400 uppercase font-extrabold text-[11px] border-b border-slate-800">
+                <tr>
+                  <th className="p-2.5">Mercado</th>
+                  <th className="p-2.5">Intercepto (a)</th>
+                  <th className="p-2.5">Inclinação (slope b)</th>
+                  <th className="p-2.5">R² (Coef. Determinação)</th>
+                  <th className="p-2.5">Amostra (N)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-mono">
+                {OLS_MARKETS_MAP.map(mObj => {
+                  const coef = olsResults[mObj.key];
+                  if (!coef) return null;
+                  return (
+                    <tr key={mObj.key} className="hover:bg-slate-900/60">
+                      <td className="p-2.5 font-sans font-extrabold text-white">{mObj.name}</td>
+                      <td className="p-2.5 font-bold text-amber-400">{coef.intercept > 0 ? `+${coef.intercept}` : coef.intercept}</td>
+                      <td className="p-2.5 font-bold text-emerald-400">{coef.slope}x</td>
+                      <td className="p-2.5 font-bold text-indigo-300">{coef.r_squared}</td>
+                      <td className="p-2.5 text-slate-400">{coef.fitted_on} jogos</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {recalculating && (
         <div className="p-4 bg-blue-950/80 border border-blue-500/50 rounded-xl text-xs font-bold text-blue-200 animate-pulse">
