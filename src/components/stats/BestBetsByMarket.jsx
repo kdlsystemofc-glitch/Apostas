@@ -60,8 +60,8 @@ export default function BestBetsByMarket({ match }) {
     { icon: "🔲", label: `Escanteios ${match.home_team}`, key: "corners_casa", x: r.xc_casa, lines: COMMERCIAL_LINES.corners_team, realKey: "corners_home", lowConfidence: true },
     { icon: "🔲", label: `Escanteios ${match.away_team}`, key: "corners_fora", x: r.xc_fora, lines: COMMERCIAL_LINES.corners_team, realKey: "corners_away", lowConfidence: true },
     { icon: "⚽", label: "Gols Total", key: "gols_total", x: r.xg_total, lines: COMMERCIAL_LINES.goals_total, sinalFn: sinalPoissonGols, realKey: "goals_total" },
-    { icon: "⚽", label: `Gols ${match.home_team}`, key: "gols_casa", x: r.xg_casa, lines: COMMERCIAL_LINES.goals_team, sinalFn: sinalPoissonGols, realKey: "goals_home" },
-    { icon: "⚽", label: `Gols ${match.away_team}`, key: "gols_fora", x: r.xg_fora, lines: COMMERCIAL_LINES.goals_team, sinalFn: sinalPoissonGols, realKey: "goals_away" },
+    { icon: "⚽", label: `Gols ${match.home_team}`, key: "gols_casa", x: r.xg_casa, lines: COMMERCIAL_LINES.goals_team, sinalFn: sinalPoissonGols, realKey: "goals_home", lowConfidence: true },
+    { icon: "⚽", label: `Gols ${match.away_team}`, key: "gols_fora", x: r.xg_fora, lines: COMMERCIAL_LINES.goals_team, sinalFn: sinalPoissonGols, realKey: "goals_away", lowConfidence: true },
     { icon: "🎯", label: "Chutes no Gol Total", key: "shots_total", x: r.xs_total, lines: COMMERCIAL_LINES.shots_target_total, realKey: "shots_total", lowConfidence: true },
     { icon: "💥", label: "Chutes Totais", key: "totalshots_total", x: r.xtotalshots_total, lines: COMMERCIAL_LINES.total_shots_total, realKey: "totalshots_total", lowConfidence: true },
     { icon: "🟨", label: "Cartões Total", key: "cards_total", x: r.xcard_total, lines: COMMERCIAL_LINES.cards_total, realKey: "cards_total" },
@@ -82,7 +82,6 @@ export default function BestBetsByMarket({ match }) {
 
   const sorted = [...rows].sort((a, b) => b.best.strength - a.best.strength);
   const candidatosSinalForte = sorted.filter(m => !m.lowConfidence);
-  const melhorSinalDoJogo = candidatosSinalForte.length > 0 ? candidatosSinalForte[0] : sorted[0];
 
   const bttsSinal = sinalBTTS(r.p_btts);
   const bttsOddMin = r.p_btts > 0 ? Math.max(1.01, Math.round((1 / r.p_btts) * 100) / 100) : "—";
@@ -108,73 +107,89 @@ export default function BestBetsByMarket({ match }) {
       <div className="divide-y divide-slate-800/60">
         {/* Mercado 1X2 Em Destaque */}
         {r.pick_1x2 && (
-          <div className="flex items-center justify-between px-5 py-3.5 bg-emerald-950/30 hover:bg-emerald-950/50 transition-colors border-b border-emerald-500/20">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-xl">🏆</span>
-              <div>
-                <p className="text-sm font-black text-emerald-400 leading-tight">
-                  Resultado 1X2 — {r.pick_1x2.resultado}
-                </p>
-                <p className="text-xs text-slate-300 font-semibold">
-                  Pick Estrita do Modelo (Vitória Mandante / Empate / Vitória Visitante)
-                </p>
+          <div className="flex flex-col px-5 py-3.5 bg-amber-950/20 border-b border-amber-500/20 gap-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-xl">🏆</span>
+                <div>
+                  <p className="text-sm font-black text-amber-400 leading-tight flex items-center gap-2">
+                    <span>Resultado 1X2 — {r.pick_1x2.resultado}</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300">
+                      ⚠ EM ESTUDO
+                    </span>
+                  </p>
+                  <p className="text-xs text-slate-300 font-semibold">
+                    Pick Estrita do Modelo (Vitória Mandante / Empate / Vitória Visitante)
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                {eval1x2.status !== "PENDENTE" && (
+                  <span className={`text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border ${
+                    eval1x2.isGreen ? "bg-emerald-600 text-white border-emerald-400" : "bg-rose-600 text-white border-rose-400"
+                  }`}>
+                    {eval1x2.isGreen ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                    {eval1x2.isGreen ? "GREEN" : "RED"}
+                  </span>
+                )}
+                <div className="text-right tabular-nums">
+                  <span className="text-sm font-black text-amber-400 block">
+                    {(r.pick_1x2.prob * 100).toFixed(1)}%
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    Odd Justa: <strong className="text-white font-bold">{r.pick_1x2.odd_minima}</strong>
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-4 shrink-0">
-              {eval1x2.status !== "PENDENTE" && (
-                <span className={`text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border ${
-                  eval1x2.isGreen ? "bg-emerald-600 text-white border-emerald-400" : "bg-rose-600 text-white border-rose-400"
-                }`}>
-                  {eval1x2.isGreen ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                  {eval1x2.isGreen ? "GREEN" : "RED"}
-                </span>
-              )}
-              <div className="text-right tabular-nums">
-                <span className="text-sm font-black text-emerald-400 block">
-                  {(r.pick_1x2.prob * 100).toFixed(1)}%
-                </span>
-                <span className="text-xs text-slate-400">
-                  Odd Justa: <strong className="text-white font-bold">{r.pick_1x2.odd_minima}</strong>
-                </span>
-              </div>
-            </div>
+            <p className="text-[11px] text-amber-400/90 mt-1 leading-snug font-sans bg-amber-950/40 p-2 rounded border border-amber-500/30">
+              O mercado 1X2 está sob validação estatística continuada (p-valor = 0.4578 no teste de permutação Brier Score). A probabilidade é exibida como informação, mas deve ser tratada em observação.
+            </p>
           </div>
         )}
 
         {/* Mercado BTTS Em Destaque */}
-        <div className="flex items-center justify-between px-5 py-3 bg-slate-950/60 hover:bg-slate-800/40 transition-colors">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-lg">🔁</span>
-            <div>
-              <p className="text-sm font-extrabold text-white leading-tight">
-                Ambas Marcam (BTTS) — {r.p_btts >= 0.50 ? "SIM" : "NÃO"}
-              </p>
-              <p className="text-xs text-slate-400 font-semibold">
-                Matriz Bivariada Dixon-Coles
-              </p>
+        <div className="flex flex-col px-5 py-3 bg-slate-950/60 hover:bg-slate-800/40 transition-colors gap-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-lg">🔁</span>
+              <div>
+                <p className="text-sm font-extrabold text-white leading-tight flex items-center gap-2">
+                  <span>Ambas Marcam (BTTS) — {r.p_btts >= 0.50 ? "SIM" : "NÃO"}</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300">
+                    ⚠ EM ESTUDO
+                  </span>
+                </p>
+                <p className="text-xs text-slate-400 font-semibold">
+                  Matriz Bivariada Dixon-Coles
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 shrink-0">
+              {hasBttsReal && (
+                <span className={`text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border ${
+                  bttsIsGreen ? "bg-emerald-600 text-white border-emerald-400" : "bg-rose-600 text-white border-rose-400"
+                }`}>
+                  {bttsIsGreen ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                  {bttsIsGreen ? "GREEN" : "RED"}
+                </span>
+              )}
+              <div className="text-right tabular-nums">
+                <span className="text-sm font-extrabold text-amber-400 block">
+                  {(r.p_btts * 100).toFixed(1)}%
+                </span>
+                <span className="text-xs text-slate-400">
+                  Odd Justa: <strong className="text-white font-bold">{bttsOddMin}</strong>
+                </span>
+              </div>
+              <span className={`px-2 py-0.5 rounded text-xs font-extrabold ${colorClasses[bttsSinal.color]}`}>
+                {bttsSinal.label}
+              </span>
             </div>
           </div>
-          <div className="flex items-center gap-4 shrink-0">
-            {hasBttsReal && (
-              <span className={`text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border ${
-                bttsIsGreen ? "bg-emerald-600 text-white border-emerald-400" : "bg-rose-600 text-white border-rose-400"
-              }`}>
-                {bttsIsGreen ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                {bttsIsGreen ? "GREEN" : "RED"}
-              </span>
-            )}
-            <div className="text-right tabular-nums">
-              <span className="text-sm font-extrabold text-emerald-400 block">
-                {(r.p_btts * 100).toFixed(1)}%
-              </span>
-              <span className="text-xs text-slate-400">
-                Odd Justa: <strong className="text-white font-bold">{bttsOddMin}</strong>
-              </span>
-            </div>
-            <span className={`px-2 py-0.5 rounded text-xs font-extrabold ${colorClasses[bttsSinal.color]}`}>
-              {bttsSinal.label}
-            </span>
-          </div>
+          <p className="text-[11px] text-amber-400/90 mt-1 leading-snug font-sans bg-amber-950/40 p-2 rounded border border-amber-500/30">
+            Mercado em estudo sob validação binomial out-of-sample (p-valor = 0.1444). Exibido como dado informativo.
+          </p>
         </div>
 
         {/* Demais Mercados Ordenados */}
