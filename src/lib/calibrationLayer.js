@@ -3,8 +3,9 @@
 //
 // Corrige o viés sistemático do modelo mecanístico usando regressão
 // linear simples ajustada sobre o histórico real de jogos.
-// Reajustar os coeficientes conforme mais jogos forem acumulados.
 // ══════════════════════════════════════════════════════════════
+
+export const CALIBRATION_ENABLED = false; // Desativado temporariamente para isolar a Camada 1
 
 export const CALIBRATION_COEFFICIENTS = {
   corners_total:      { intercept: 0, slope: 1, fitted_on: 0, r_squared: null },
@@ -28,6 +29,7 @@ export function setCalibrationCoefficients(newCoefs) {
 }
 
 export function aplicarCalibracao(valorBruto, mercadoKey) {
+  if (!CALIBRATION_ENABLED) return valorBruto;
   const coef = CALIBRATION_COEFFICIENTS[mercadoKey];
   if (!coef) return valorBruto;
   const calibrado = coef.intercept + coef.slope * valorBruto;
