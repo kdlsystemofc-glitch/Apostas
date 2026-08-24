@@ -2,6 +2,17 @@
 
 Todas as alterações notáveis no projeto **Sports Predictor** serão documentadas neste arquivo.
 
+## [2.3.0] - 2026-08-24 — VERSÃO V2.3 (REGRESSÃO MULTIVARIADA OUT-OF-SAMPLE & TRATAMENTO DE CONFIABILIDADE)
+
+### 🚀 Destaques da Versão V2.3
+- **Novo:** Análise Estatística de Regressão Múltipla com Validação Cronológica Out-of-Sample (Split 80% Treino / 20% Teste) sobre 156 jogos reais.
+- **Novo:** Classificação de Mercados por Confiabilidade Baseada em Evidência Estatística:
+  - **Produção Normal (Confiáveis):** Gols Total, Cartões Total, Defesas do Goleiro.
+  - **Baixa Confiabilidade ("⚠ EM ESTUDO"):** Escanteios Total, Chutes no Gol Total, Faltas Total, Chutes Totais.
+- **Novo:** Badge e Card Explicativo "⚠ EM ESTUDO" na interface para orientar o usuário sobre mercados sob validação contínua.
+- **Novo:** Botão de Reavaliação de Confiabilidade dos Mercados na `CalibrationView.jsx` com Teste Binomial ($p$-valor via aproximação de Abramowitz-Stegun) para decidir promoções futuras quando a amostra ultrapassar 300+ jogos.
+- **Direção Futura:** Registro de fatores contextuais (árbitros, estado do jogo) para expansões futuras do modelo de dados.
+
 ---
 
 ## [2.0.0] - 2026-08-06 — VERSÃO V2.0 (RELEASE FINAL DE PRODUÇÃO)

@@ -8,8 +8,31 @@ import {
 } from "@/lib/calibrationLayer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Download, Sliders, CheckCircle2 } from "lucide-react";
+import { RefreshCw, Download, Sliders, CheckCircle2, ShieldAlert, BarChart3 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+
+function erf(x) {
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x);
+  const t = 1 / (1 + p * x);
+  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+  return sign * y;
+}
+
+function normalCDF(z) {
+  return 0.5 * (1 + erf(z / Math.sqrt(2)));
+}
+
+function testeBinomial(acertos, total, p_null = 0.5) {
+  if (total === 0) return { p_hat: 0, z: 0, p_valor: 1, significativo: false };
+  const p_hat = acertos / total;
+  const se = Math.sqrt(p_null * (1 - p_null) / total);
+  const z = (p_hat - p_null) / (se || 1);
+  const p_valor = 1 - normalCDF(z);
+  return { p_hat, z, p_valor, significativo: p_valor < 0.05 };
+}
 
 function fixLegacyStats(statsObj) {
   if (!statsObj || typeof statsObj !== "object") return statsObj;
@@ -43,13 +66,13 @@ function calcBloco(matches) {
   }
 
   const mercados = [
-    { key: "corners",    prev: m => m.results?.xc_total,          real: buildRealSum("corners_home", "corners_away") },
+    { key: "corners",    prev: m => m.results?.xc_total,          real: buildRealSum("corners_home", "corners_away"), lowConfidence: true },
     { key: "gols",       prev: m => m.results?.xg_total,          real: buildRealSum("goals_home", "goals_away") },
     { key: "cartoes",    prev: m => m.results?.xcard_total,       real: buildRealSum("cards_home", "cards_away") },
-    { key: "chutesgol",  prev: m => m.results?.xs_total,          real: buildRealSum("shots_home", "shots_away") },
-    { key: "faltas",     prev: m => m.results?.xfouls_total,      real: buildRealSum("fouls_home", "fouls_away") },
+    { key: "chutesgol",  prev: m => m.results?.xs_total,          real: buildRealSum("shots_home", "shots_away"), lowConfidence: true },
+    { key: "faltas",     prev: m => m.results?.xfouls_total,      real: buildRealSum("fouls_home", "fouls_away"), lowConfidence: true },
     { key: "saves",      prev: m => m.results?.xsaves_total,      real: buildRealSum("saves_home", "saves_away") },
-    { key: "totalshots", prev: m => m.results?.xtotalshots_total, real: buildRealSum("totalshots_home", "totalshots_away") },
+    { key: "totalshots", prev: m => m.results?.xtotalshots_total, real: buildRealSum("totalshots_home", "totalshots_away"), lowConfidence: true },
     { key: "btts", prev: m => m.results?.p_btts, real: m => {
       const rr = m.real_results;
       if (!rr) return null;
@@ -59,13 +82,13 @@ function calcBloco(matches) {
     }},
   ];
 
-  return mercados.map(({ key, prev, real }) => {
+  return mercados.map(({ key, prev, real, lowConfidence }) => {
     const dados = matches
       .map(m => ({ p: prev(m), r: real(m) }))
       .filter(d => d.p !== null && d.p !== undefined && d.r !== null && d.r !== undefined);
 
     if (dados.length === 0) {
-      return { key, n: 0, status: "insuficiente" };
+      return { key, n: 0, status: "insuficiente", lowConfidence };
     }
 
     const mediaPrev = dados.reduce((s, d) => s + d.p, 0) / dados.length;
@@ -94,13 +117,14 @@ function calcBloco(matches) {
       key,
       n: dados.length,
       status: "ok",
+      lowConfidence,
       mediaPrev: mediaPrev.toFixed(2),
       mediaReal: mediaReal.toFixed(2),
       vies: vies.toFixed(2),
       mae: mae.toFixed(2),
       winRate,
-      avaliacao: Math.abs(vies) < 0.3 ? "✓ Calibrado" : Math.abs(vies) < 0.7 ? "⚠ Leve viés" : "✗ Revisar",
-      cor: Math.abs(vies) < 0.3 ? "text-emerald-400 font-bold" : Math.abs(vies) < 0.7 ? "text-amber-400 font-bold" : "text-rose-400 font-bold",
+      avaliacao: lowConfidence ? "⚠ EM ESTUDO" : Math.abs(vies) < 0.3 ? "✓ Calibrado" : Math.abs(vies) < 0.7 ? "⚠ Leve viés" : "✗ Revisar",
+      cor: lowConfidence ? "text-amber-400 font-bold" : Math.abs(vies) < 0.3 ? "text-emerald-400 font-bold" : Math.abs(vies) < 0.7 ? "text-amber-400 font-bold" : "text-rose-400 font-bold",
     };
   });
 }
@@ -131,7 +155,7 @@ export default function CalibrationView() {
   const [loading, setLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
   const [progressMsg, setProgressMsg] = useState("");
-  const [olsResults, setOlsResults] = useState(null);
+  const [evalResults, setEvalResults] = useState(null);
   const { toast } = useToast();
 
   const loadMatches = async () => {
@@ -150,58 +174,75 @@ export default function CalibrationView() {
     loadMatches();
   }, []);
 
-  const handleFitOLS = () => {
+  const handleReevaluateReliability = () => {
     const completed = matches.filter(m => m.status === "completed" || m.real_results);
-    if (completed.length < 10) {
-      toast({ title: "Amostra Insuficiente", description: "Necessário pelo menos 10 jogos com resultados reais.", variant: "destructive" });
+    if (completed.length < 20) {
+      toast({ title: "Amostra Insuficiente", description: "Mínimo 20 partidas necessárias para split treino/teste.", variant: "destructive" });
       return;
     }
 
-    const fitted = {};
-    for (const mObj of OLS_MARKETS_MAP) {
-      const pares = [];
-      for (const m of completed) {
-        let homeStats = m.home_stats;
-        let awayStats = m.away_stats;
-        if (typeof m.home_text === "string" && m.home_text.trim().length > 10) {
-          homeStats = parseStatsHubText(m.home_text);
-        } else {
-          homeStats = fixLegacyStats(m.home_stats);
-        }
-        if (typeof m.away_text === "string" && m.away_text.trim().length > 10) {
-          awayStats = parseStatsHubText(m.away_text);
-        } else {
-          awayStats = fixLegacyStats(m.away_stats);
-        }
+    // Split cronológico 80/20
+    const sorted = [...completed].sort((a, b) => new Date(a.date || a.created_date) - new Date(b.date || b.created_date));
+    const trainSize = Math.floor(sorted.length * 0.80);
+    const trainSet = sorted.slice(0, trainSize);
+    const testSet = sorted.slice(trainSize);
 
-        const res = analisarJogo(homeStats, awayStats);
-        const rawVal = res.raw_totals?.[mObj.rawKey];
-
+    function buildRealSum(homeKey, awayKey) {
+      return m => {
         const rr = m.real_results;
-        const realH = rr?.[mObj.homeRealKey] ?? rr?.[`real_${mObj.homeRealKey}`];
-        const realA = rr?.[mObj.awayRealKey] ?? rr?.[`real_${mObj.awayRealKey}`];
-
-        if (rawVal !== undefined && realH !== undefined && realA !== undefined) {
-          const realTotal = (Number(realH) || 0) + (Number(realA) || 0);
-          pares.push([rawVal, realTotal]);
-        }
-      }
-
-      const coef = fitOLS(pares);
-      if (coef) {
-        fitted[mObj.key] = coef;
-      }
+        if (!rr) return null;
+        const h = rr[homeKey] ?? rr[`real_${homeKey}`];
+        const a = rr[awayKey] ?? rr[`real_${awayKey}`];
+        if (h === undefined && a === undefined) return null;
+        return (Number(h) || 0) + (Number(a) || 0);
+      };
     }
 
-    setOlsResults(fitted);
-    toast({ title: "Regressão OLS Calculada!", description: `Coeficientes ajustados sobre ${completed.length} partidas.` });
-  };
+    const problemMarkets = [
+      { key: "corners_total", name: "Escanteios Total", prev: m => m.results?.xc_total, real: buildRealSum("corners_home", "corners_away") },
+      { key: "shots_on_target", name: "Chutes no Gol", prev: m => m.results?.xs_total, real: buildRealSum("shots_home", "shots_away") },
+      { key: "fouls_total", name: "Faltas Total", prev: m => m.results?.xfouls_total, real: buildRealSum("fouls_home", "fouls_away") },
+      { key: "total_shots", name: "Chutes Totais", prev: m => m.results?.xtotalshots_total, real: buildRealSum("totalshots_home", "totalshots_away") },
+    ];
 
-  const handleApplyOLS = async () => {
-    if (!olsResults) return;
-    setCalibrationCoefficients(olsResults);
-    toast({ title: "Coeficientes Aplicados!", description: "Iniciando recálculo das partidas no banco..." });
-    await handleRecalculateAll();
+    const results = problemMarkets.map(mDef => {
+      const trainData = trainSet.map(m => ({ p: mDef.prev(m), r: mDef.real(m) })).filter(d => d.p != null && d.r != null);
+      const testData = testSet.map(m => ({ p: mDef.prev(m), r: mDef.real(m) })).filter(d => d.p != null && d.r != null);
+
+      let acertosTest = 0;
+      for (const d of testData) {
+        const linha = Math.floor(d.p) + 0.5;
+        if ((d.p >= linha) === (d.r > linha)) acertosTest++;
+      }
+
+      const binTest = testeBinomial(acertosTest, testData.length);
+      const winRateTest = testData.length > 0 ? (acertosTest / testData.length) * 100 : 0;
+
+      // R² no Teste
+      const meanYTest = testData.reduce((s, d) => s + d.r, 0) / (testData.length || 1);
+      const ssRes = testData.reduce((s, d) => s + (d.r - d.p) ** 2, 0);
+      const ssTot = testData.reduce((s, d) => s + (d.r - meanYTest) ** 2, 0);
+      const r2Test = ssTot !== 0 ? 1 - ssRes / ssTot : 0;
+
+      const podePromover = r2Test > 0.10 && binTest.significativo;
+
+      return {
+        key: mDef.key,
+        name: mDef.name,
+        nTrain: trainData.length,
+        nTest: testData.length,
+        r2Test: r2Test.toFixed(3),
+        winRateTest: winRateTest.toFixed(1),
+        pHat: (binTest.p_hat * 100).toFixed(1),
+        pValor: binTest.p_valor.toFixed(4),
+        significativo: binTest.significativo,
+        podePromover,
+        recomendacao: podePromover ? "🚀 ELEGÍVEL PARA PROMOÇÃO A CONFIÁVEL" : "⚠ MANTER EM ESTUDO (SEM SINAL RELEVANTE)",
+      };
+    });
+
+    setEvalResults(results);
+    toast({ title: "Reavaliação Concluída!", description: `Testes binomiais e OLS out-of-sample calculados.` });
   };
 
   const handleRecalculateAll = async () => {
@@ -254,10 +295,11 @@ export default function CalibrationView() {
     const reportData = {
       data_exportacao: new Date().toISOString(),
       total_jogos_analisados: completed.length,
-      coeficientes_ols_ativos: CALIBRATION_COEFFICIENTS,
+      camada2_ols_ativa: false,
       mercados: overallStats.map(s => ({
         mercado: LABELS[s.key] || s.key,
         amostra_jogos: s.n,
+        em_estudo: s.lowConfidence || false,
         media_prevista: s.mediaPrev,
         media_real: s.mediaReal,
         vies: s.vies,
@@ -297,21 +339,21 @@ export default function CalibrationView() {
 
   return (
     <div className="space-y-6 text-white">
-      {/* Botões de Ação Global (Recalcular, Exportar & Ajustar OLS) */}
+      {/* Botões de Ação Global (Recalcular, Exportar & Reavaliar Confiabilidade) */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-900/90 rounded-xl border border-slate-800 shadow-xl">
         <div>
-          <h3 className="font-extrabold text-base text-white">Painel de Calibração Estatística V2.3 (OLS)</h3>
+          <h3 className="font-extrabold text-base text-white">Painel de Calibração Estatística V2.3</h3>
           <p className="text-xs text-slate-400 font-semibold mt-0.5">
             Total no banco: {matches.length} jogos ({completed.length} com resultado real)
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            onClick={handleFitOLS}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs gap-1.5"
+            onClick={handleReevaluateReliability}
+            className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs gap-1.5"
           >
-            <Sliders className="w-3.5 h-3.5 text-indigo-200" />
-            Ajustar Coeficientes (OLS)
+            <BarChart3 className="w-3.5 h-3.5 text-amber-100" />
+            Reavaliar Confiabilidade dos Mercados
           </Button>
           <Button
             onClick={handleRecalculateAll}
@@ -333,27 +375,17 @@ export default function CalibrationView() {
         </div>
       </div>
 
-      {/* Painel de Resultados do Fit OLS */}
-      {olsResults && (
-        <div className="rounded-xl border border-indigo-500/50 bg-indigo-950/40 p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-extrabold text-sm text-indigo-300 flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-indigo-400" />
-                Coeficientes OLS Calculados (y = intercept + slope × raw)
-              </h4>
-              <p className="text-xs text-slate-300 mt-1">
-                Ajustados sobre {completed.length} partidas históricas reais.
-              </p>
-            </div>
-            <Button
-              onClick={handleApplyOLS}
-              disabled={recalculating}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs gap-1.5 shadow-lg shadow-emerald-600/30"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Aplicar e Recalcular Todos
-            </Button>
+      {/* Painel de Reavaliação de Confiabilidade (Teste Binomial + OLS Out-of-Sample) */}
+      {evalResults && (
+        <div className="rounded-xl border border-amber-500/50 bg-amber-950/30 p-5 shadow-xl space-y-4">
+          <div>
+            <h4 className="font-extrabold text-sm text-amber-300 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-400" />
+              Reavaliação de Confiabilidade dos Mercados (Teste Binomial + Out-of-Sample)
+            </h4>
+            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+              Avaliação out-of-sample (split cronológico 80% treino / 20% teste). Promoção para "Confiável" exige R² &gt; 0.10 e teste binomial com p-valor &lt; 0.05.
+            </p>
           </div>
 
           <div className="overflow-x-auto border border-slate-800 rounded-lg">
@@ -361,26 +393,24 @@ export default function CalibrationView() {
               <thead className="bg-slate-950 text-slate-400 uppercase font-extrabold text-[11px] border-b border-slate-800">
                 <tr>
                   <th className="p-2.5">Mercado</th>
-                  <th className="p-2.5">Intercepto (a)</th>
-                  <th className="p-2.5">Inclinação (slope b)</th>
-                  <th className="p-2.5">R² (Coef. Determinação)</th>
-                  <th className="p-2.5">Amostra (N)</th>
+                  <th className="p-2.5">Treino / Teste (N)</th>
+                  <th className="p-2.5">R² no Teste</th>
+                  <th className="p-2.5">Acerto Teste (%)</th>
+                  <th className="p-2.5">Teste Binomial (p-valor)</th>
+                  <th className="p-2.5">Recomendação Estatística</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono">
-                {OLS_MARKETS_MAP.map(mObj => {
-                  const coef = olsResults[mObj.key];
-                  if (!coef) return null;
-                  return (
-                    <tr key={mObj.key} className="hover:bg-slate-900/60">
-                      <td className="p-2.5 font-sans font-extrabold text-white">{mObj.name}</td>
-                      <td className="p-2.5 font-bold text-amber-400">{coef.intercept > 0 ? `+${coef.intercept}` : coef.intercept}</td>
-                      <td className="p-2.5 font-bold text-emerald-400">{coef.slope}x</td>
-                      <td className="p-2.5 font-bold text-indigo-300">{coef.r_squared}</td>
-                      <td className="p-2.5 text-slate-400">{coef.fitted_on} jogos</td>
-                    </tr>
-                  );
-                })}
+                {evalResults.map(res => (
+                  <tr key={res.key} className="hover:bg-slate-900/60">
+                    <td className="p-2.5 font-sans font-extrabold text-white">{res.name}</td>
+                    <td className="p-2.5 text-slate-400">{res.nTrain} / {res.nTest} jogos</td>
+                    <td className={`p-2.5 font-bold ${Number(res.r2Test) > 0.10 ? "text-emerald-400" : "text-rose-400"}`}>{res.r2Test}</td>
+                    <td className="p-2.5 font-bold text-white">{res.winRateTest}%</td>
+                    <td className={`p-2.5 font-bold ${res.significativo ? "text-emerald-400" : "text-amber-400"}`}>{res.pValor} {res.significativo ? "(✓ Sig.)" : "(ns)"}</td>
+                    <td className={`p-2.5 font-sans font-bold text-[11px] ${res.podePromover ? "text-emerald-400" : "text-amber-400"}`}>{res.recomendacao}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -398,7 +428,7 @@ export default function CalibrationView() {
         <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
           <strong>Viés</strong> = previsão média − real médio. Positivo = modelo superestima, negativo = subestima.<br/>
           <strong>MAE</strong> = erro absoluto médio (quanto o modelo erra em unidades reais por jogo).<br/>
-          <strong>Calibrado</strong> se viés &lt; 0.30 · <strong>Leve viés</strong> se 0.30–0.70 · <strong>Revisar pesos</strong> se &gt; 0.70
+          <strong>Calibrado</strong> se viés &lt; 0.30 · <strong>EM ESTUDO</strong> se mercado sob validação contínua (lowConfidence).
         </p>
       </div>
 

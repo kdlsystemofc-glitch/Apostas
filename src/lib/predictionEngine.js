@@ -1,6 +1,16 @@
 // ══════════════════════════════════════════════════════════════
 // PREDICTION ENGINE V2.3 — MOTOR AUTÔNOMO COM CAMADA DE RECALIBRAÇÃO ESTATÍSTICA (OLS)
 // ══════════════════════════════════════════════════════════════
+//
+// 📌 NOTA DE DIREÇÃO FUTURA (DIRETRIZES DE LONGO PRAZO):
+// 1. Mercados como Escanteios, Chutes no Gol, Faltas e Chutes Totais são reconhecidamente
+//    mais difíceis de prever em futebol do que Gols/Cartões/Defesas. Dependem fortemente de
+//    fatores contextuais específicos do jogo (arbitragem, estado do placar, tática).
+// 2. Fonte de sinal futura não capturada atualmente: Identidade do Árbitro.
+//    A inclusão de dados do árbitro pode melhorar significativamente os mercados de Faltas e Cartões.
+// 3. Escalabilidade de amostra: Com mais dados (300-500+ jogos), regressões multivariadas
+//    poderão ser reavaliadas através do botão de reavaliação na CalibrationView.
+//
 
 import { aplicarCalibracao } from "./calibrationLayer";
 

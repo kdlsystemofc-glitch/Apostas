@@ -56,21 +56,21 @@ export default function BestBetsByMarket({ match }) {
   };
 
   const mercados = [
-    { icon: "🔲", label: "Escanteios Total", key: "corners_total", x: r.xc_total, lines: COMMERCIAL_LINES.corners_total, realKey: "corners_total" },
-    { icon: "🔲", label: `Escanteios ${match.home_team}`, key: "corners_casa", x: r.xc_casa, lines: COMMERCIAL_LINES.corners_team, realKey: "corners_home" },
-    { icon: "🔲", label: `Escanteios ${match.away_team}`, key: "corners_fora", x: r.xc_fora, lines: COMMERCIAL_LINES.corners_team, realKey: "corners_away" },
+    { icon: "🔲", label: "Escanteios Total", key: "corners_total", x: r.xc_total, lines: COMMERCIAL_LINES.corners_total, realKey: "corners_total", lowConfidence: true },
+    { icon: "🔲", label: `Escanteios ${match.home_team}`, key: "corners_casa", x: r.xc_casa, lines: COMMERCIAL_LINES.corners_team, realKey: "corners_home", lowConfidence: true },
+    { icon: "🔲", label: `Escanteios ${match.away_team}`, key: "corners_fora", x: r.xc_fora, lines: COMMERCIAL_LINES.corners_team, realKey: "corners_away", lowConfidence: true },
     { icon: "⚽", label: "Gols Total", key: "gols_total", x: r.xg_total, lines: COMMERCIAL_LINES.goals_total, sinalFn: sinalPoissonGols, realKey: "goals_total" },
     { icon: "⚽", label: `Gols ${match.home_team}`, key: "gols_casa", x: r.xg_casa, lines: COMMERCIAL_LINES.goals_team, sinalFn: sinalPoissonGols, realKey: "goals_home" },
     { icon: "⚽", label: `Gols ${match.away_team}`, key: "gols_fora", x: r.xg_fora, lines: COMMERCIAL_LINES.goals_team, sinalFn: sinalPoissonGols, realKey: "goals_away" },
-    { icon: "🎯", label: "Chutes no Gol Total", key: "shots_total", x: r.xs_total, lines: COMMERCIAL_LINES.shots_target_total, realKey: "shots_total" },
-    { icon: "💥", label: "Chutes Totais", key: "totalshots_total", x: r.xtotalshots_total, lines: COMMERCIAL_LINES.total_shots_total, realKey: "totalshots_total" },
+    { icon: "🎯", label: "Chutes no Gol Total", key: "shots_total", x: r.xs_total, lines: COMMERCIAL_LINES.shots_target_total, realKey: "shots_total", lowConfidence: true },
+    { icon: "💥", label: "Chutes Totais", key: "totalshots_total", x: r.xtotalshots_total, lines: COMMERCIAL_LINES.total_shots_total, realKey: "totalshots_total", lowConfidence: true },
     { icon: "🟨", label: "Cartões Total", key: "cards_total", x: r.xcard_total, lines: COMMERCIAL_LINES.cards_total, realKey: "cards_total" },
     { icon: "🧤", label: "Defesas Goleiro Total", key: "saves_total", x: r.xsaves_total, lines: COMMERCIAL_LINES.saves_total, realKey: "saves_total" },
-    { icon: "🤜", label: "Faltas Total", key: "fouls_total", x: r.xfouls_total, lines: COMMERCIAL_LINES.fouls_total, realKey: "fouls_total" },
+    { icon: "🤜", label: "Faltas Total", key: "fouls_total", x: r.xfouls_total, lines: COMMERCIAL_LINES.fouls_total, realKey: "fouls_total", lowConfidence: true, hidden: true },
   ];
 
   const rows = mercados
-    .filter(m => m.x != null && m.x > 0)
+    .filter(m => !m.hidden && m.x != null && m.x > 0)
     .map(m => {
       const best = bestCommercialLine(m.x, m.lines, m.sinalFn || sinalPoisson);
       const realVal = rr?.[m.realKey] ?? rr?.[`real_${m.realKey}`];
@@ -81,6 +81,8 @@ export default function BestBetsByMarket({ match }) {
     .filter(m => m.best != null);
 
   const sorted = [...rows].sort((a, b) => b.best.strength - a.best.strength);
+  const candidatosSinalForte = sorted.filter(m => !m.lowConfidence);
+  const melhorSinalDoJogo = candidatosSinalForte.length > 0 ? candidatosSinalForte[0] : sorted[0];
 
   const bttsSinal = sinalBTTS(r.p_btts);
   const bttsOddMin = r.p_btts > 0 ? Math.max(1.01, Math.round((1 / r.p_btts) * 100) / 100) : "—";
@@ -177,39 +179,52 @@ export default function BestBetsByMarket({ match }) {
 
         {/* Demais Mercados Ordenados */}
         {sorted.map(m => (
-          <div key={m.label} className="flex items-center justify-between px-5 py-3 hover:bg-slate-800/40 transition-colors">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-lg flex-shrink-0">{m.icon}</span>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-100 leading-tight truncate">
-                  Over {m.best.linha} {m.label}
-                </p>
-                <p className="text-xs text-slate-400 font-semibold tabular-nums">
-                  Projeção: <strong className="text-blue-400 font-bold">{m.x}</strong>
-                </p>
+          <div key={m.label} className="flex flex-col px-5 py-3 hover:bg-slate-800/40 transition-colors gap-1 border-t border-slate-800/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-lg flex-shrink-0">{m.icon}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-100 leading-tight flex items-center gap-1.5 flex-wrap">
+                    <span>Over {m.best.linha} {m.label}</span>
+                    {m.lowConfidence && (
+                      <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300 shrink-0">
+                        ⚠ EM ESTUDO
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-slate-400 font-semibold tabular-nums mt-0.5">
+                    Projeção: <strong className="text-blue-400 font-bold">{m.x}</strong>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                {m.hasReal && (
+                  <span className={`text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border ${
+                    m.isGreen ? "bg-emerald-600 text-white border-emerald-400" : "bg-rose-600 text-white border-rose-400"
+                  }`}>
+                    {m.isGreen ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                    {m.isGreen ? `GREEN (${m.realVal})` : `RED (${m.realVal})`}
+                  </span>
+                )}
+                <div className="text-right tabular-nums">
+                  <span className="text-sm font-extrabold text-emerald-400 block">
+                    {(m.best.prob * 100).toFixed(1)}%
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    Odd Justa: <strong className="text-white font-bold">{m.best.oddMinima}</strong>
+                  </span>
+                </div>
+                <span className={`px-2 py-0.5 rounded text-xs font-extrabold ${colorClasses[m.best.sinal.color]}`}>
+                  {m.best.sinal.label}
+                </span>
               </div>
             </div>
-            <div className="flex items-center gap-4 shrink-0">
-              {m.hasReal && (
-                <span className={`text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border ${
-                  m.isGreen ? "bg-emerald-600 text-white border-emerald-400" : "bg-rose-600 text-white border-rose-400"
-                }`}>
-                  {m.isGreen ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                  {m.isGreen ? `GREEN (${m.realVal})` : `RED (${m.realVal})`}
-                </span>
-              )}
-              <div className="text-right tabular-nums">
-                <span className="text-sm font-extrabold text-emerald-400 block">
-                  {(m.best.prob * 100).toFixed(1)}%
-                </span>
-                <span className="text-xs text-slate-400">
-                  Odd Justa: <strong className="text-white font-bold">{m.best.oddMinima}</strong>
-                </span>
-              </div>
-              <span className={`px-2 py-0.5 rounded text-xs font-extrabold ${colorClasses[m.best.sinal.color]}`}>
-                {m.best.sinal.label}
-              </span>
-            </div>
+
+            {m.lowConfidence && (
+              <p className="text-[11px] text-amber-400/90 mt-1 leading-snug font-sans bg-amber-950/40 p-2 rounded border border-amber-500/30">
+                Este mercado está sob validação estatística contínua. Com os dados disponíveis até agora (156 jogos), não foi possível confirmar sinal preditivo confiável fora da amostra de treino. A projeção ainda é exibida como informação, mas não deve ser tratada como uma recomendação forte de aposta.
+              </p>
+            )}
           </div>
         ))}
       </div>

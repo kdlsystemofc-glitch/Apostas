@@ -34,31 +34,19 @@ function getMatchSignals(match) {
     });
   }
 
-  // Corners
-  const corners = bestSignalCommercial("Escanteios", r.xc_total, COMMERCIAL_LINES.corners_total);
-  if (corners && corners.sinal.label !== "NEUTRO") signals.push(corners);
-
-  // Goals
+  // Goals (Mercado Validade)
   const goals = bestSignalCommercial("Gols", r.xg_total, COMMERCIAL_LINES.goals_total, sinalPoissonGols);
   if (goals && goals.sinal.label !== "NEUTRO") signals.push(goals);
 
-  // Shots on Target
-  const shots = bestSignalCommercial("Chutes no Gol", r.xs_total, COMMERCIAL_LINES.shots_target_total);
-  if (shots && shots.sinal.label !== "NEUTRO") signals.push(shots);
-
-  // Cards
+  // Cards (Mercado Validade)
   const cards = bestSignalCommercial("Cartões", r.xcard_total, COMMERCIAL_LINES.cards_total);
   if (cards && cards.sinal.label !== "NEUTRO") signals.push(cards);
 
-  // Saves
+  // Saves (Mercado Validade)
   const saves = bestSignalCommercial("Defesas Goleiro", r.xsaves_total, COMMERCIAL_LINES.saves_total);
   if (saves && saves.sinal.label !== "NEUTRO") signals.push(saves);
 
-  // Total Shots
-  const totalshots = bestSignalCommercial("Chutes Totais", r.xtotalshots_total, COMMERCIAL_LINES.total_shots_total);
-  if (totalshots && totalshots.sinal.label !== "NEUTRO") signals.push(totalshots);
-
-  // BTTS Bivariado
+  // BTTS Bivariado (Mercado Validade)
   if (r.p_btts != null) {
     const sBTTS = sinalBTTS(r.p_btts);
     if (sBTTS.label !== "NEUTRO") {
@@ -73,6 +61,7 @@ function getMatchSignals(match) {
     }
   }
 
+  // Mercados em Estudo (Escanteios, Chutes no Gol, Faltas, Chutes Totais) são EXCLUÍDOS da lista de palpites do dia
   return signals.sort((a, b) => b.strength - a.strength);
 }
 
@@ -111,7 +100,6 @@ export default function DailyOverview() {
     );
   }
 
-  // Agrupa por data
   const grouped = matches.reduce((acc, m) => {
     const d = m.date || "Sem data";
     if (!acc[d]) acc[d] = [];
@@ -140,82 +128,74 @@ export default function DailyOverview() {
             <h3 className="text-sm font-extrabold text-slate-200 uppercase tracking-wide capitalize">
               {formatDate(dateKey)}
             </h3>
-            <span className="text-xs text-slate-400 font-semibold">({grouped[dateKey].length} {grouped[dateKey].length === 1 ? "jogo" : "jogos"})</span>
+            <span className="text-xs font-semibold text-slate-400">({grouped[dateKey].length} jogos)</span>
           </div>
 
           <div className="space-y-3">
-            {grouped[dateKey].map((match) => {
-              const signals = getMatchSignals(match);
+            {grouped[dateKey].map((m) => {
+              const signals = getMatchSignals(m);
               const topSignal = signals[0];
 
               return (
                 <div
-                  key={match.id}
-                  className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md overflow-hidden hover:border-slate-700 transition-all cursor-pointer shadow-xl group"
-                  onClick={() => navigate(`/match/${match.id}`)}
+                  key={m.id}
+                  onClick={() => navigate(`/match/${m.id}`)}
+                  className="group bg-slate-900/90 hover:bg-slate-850 rounded-xl p-4 border border-slate-800/80 hover:border-slate-700 transition-all cursor-pointer shadow-lg hover:shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
                 >
-                  <div className="px-4 py-3 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                        match.status === "completed" ? "bg-emerald-400" : "bg-amber-400 animate-pulse"
-                      }`} />
-                      <p className="font-extrabold text-base text-white">
-                        {match.home_team} <span className="text-emerald-400 font-bold mx-1 text-sm">vs</span> {match.away_team}
-                      </p>
-                      {match.real_results && Object.keys(match.real_results).length > 0 && (
-                        <p className="text-xs text-emerald-400 font-bold ml-2 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
-                          ✓ Resultado Registrado
-                        </p>
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <div className="text-center min-w-[70px] shrink-0 border-r border-slate-800 pr-4">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                        {m.status === "completed" ? "FINALIZADO" : "EM BREVE"}
+                      </span>
+                      <span className="text-xs font-extrabold text-slate-300 font-mono mt-0.5 block">
+                        {m.date ? m.date.split("-").slice(1).join("/") : "—"}
+                      </span>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 font-black text-sm text-white">
+                        <span>{m.home_team}</span>
+                        <span className="text-xs text-slate-500 font-normal">vs</span>
+                        <span>{m.away_team}</span>
+                      </div>
+
+                      {topSignal ? (
+                        <div className="flex items-center gap-2 mt-1 text-xs">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="text-slate-300 font-semibold truncate">
+                            Destaque: <strong className="text-white">{topSignal.market}</strong> —{" "}
+                            {topSignal.isResult
+                              ? topSignal.sinal.label
+                              : topSignal.isBTTS
+                              ? `${topSignal.market}: ${topSignal.prob >= 0.5 ? "SIM" : "NÃO"}`
+                              : `Over ${topSignal.line}`}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 mt-1">Clique para ver análise completa</p>
                       )}
                     </div>
-                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-400 transition-colors" />
                   </div>
 
-                  <div className="p-3.5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {signals.map((sig, i) => (
-                      <div key={i} className="rounded-lg bg-slate-950/60 p-3 text-center border border-slate-800/80">
-                        <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide truncate">{sig.market}</p>
-                        {sig.isResult ? (
-                          <>
-                            <p className="text-base font-black mt-0.5 text-emerald-400 truncate">{sig.sinal.label}</p>
-                            <p className="text-xs font-bold text-white tabular-nums">{(sig.prob * 100).toFixed(1)}% <span className="text-slate-400 text-[10px]">(Odd {sig.oddMinima})</span></p>
-                          </>
-                        ) : sig.isBTTS ? (
-                          <>
-                            <p className="text-lg font-black text-white tabular-nums mt-0.5">{(sig.prob * 100).toFixed(1)}%</p>
-                            <p className="text-[10px] text-emerald-400 font-bold">Odd Justa: {sig.oddMinima}</p>
-                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-extrabold ${colorClasses[sig.sinal.color]}`}>
-                              {sig.sinal.label}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-xs font-bold text-slate-200 mt-0.5">Over {sig.line}</p>
-                            <p className="text-lg font-black text-white tabular-nums">{(sig.prob * 100).toFixed(1)}%</p>
-                            <p className="text-[10px] text-emerald-400 font-bold">Odd Justa: {sig.oddMinima}</p>
-                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-extrabold ${colorClasses[sig.sinal.color]}`}>
-                              {sig.sinal.label}
-                            </span>
-                          </>
-                        )}
+                  <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end shrink-0 border-t md:border-t-0 border-slate-800/60 pt-3 md:pt-0">
+                    {topSignal && (
+                      <div className="flex items-center gap-2">
+                        <div className="text-right tabular-nums">
+                          <span className="text-xs font-black text-emerald-400 block">
+                            {(topSignal.prob * 100).toFixed(1)}%
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-semibold">
+                            Odd: <strong className="text-white">{topSignal.oddMinima}</strong>
+                          </span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-xs font-extrabold ${colorClasses[topSignal.sinal.color] || colorClasses.green}`}>
+                          {topSignal.sinal.label}
+                        </span>
                       </div>
-                    ))}
-                  </div>
+                    )}
 
-                  {topSignal && (
-                    <div className="px-4 py-2.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs font-bold">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Aposta de Maior Valor:
-                      </span>
-                      <span className="font-extrabold text-emerald-400 tabular-nums">
-                        {topSignal.isResult
-                          ? `${topSignal.sinal.label} — ${(topSignal.prob * 100).toFixed(1)}% (Odd Justa: ${topSignal.oddMinima})`
-                          : topSignal.isBTTS
-                          ? `Ambas Marcam (${topSignal.sinal.label}) — ${(topSignal.prob * 100).toFixed(1)}% (Odd Justa: ${topSignal.oddMinima})`
-                          : `${topSignal.market} Over ${topSignal.line} — ${(topSignal.prob * 100).toFixed(1)}% (Odd Justa: ${topSignal.oddMinima})`}
-                      </span>
-                    </div>
-                  )}
+                    <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all ml-1" />
+                  </div>
                 </div>
               );
             })}
