@@ -18,8 +18,11 @@ export default function StatsInput({ onAnalysisComplete }) {
 
   const { toast } = useToast();
 
-  const homeStatsCount = Object.keys(parseStatsHubText(homeText)).length;
-  const awayStatsCount = Object.keys(parseStatsHubText(awayText)).length;
+  const parsedHome = parseStatsHubText(homeText);
+  const parsedAway = parseStatsHubText(awayText);
+
+  const homeStatsCount = Object.keys(parsedHome).length;
+  const awayStatsCount = Object.keys(parsedAway).length;
   const statsInsuficientes = homeStatsCount < 5 || awayStatsCount < 5;
 
   const handleAnalyze = async () => {
@@ -53,6 +56,8 @@ export default function StatsInput({ onAnalysisComplete }) {
         date: matchDate,
         home_stats: homeStats,
         away_stats: awayStats,
+        home_text: homeText.trim(),
+        away_text: awayText.trim(),
         results,
         status: "pending",
       });
@@ -126,6 +131,15 @@ export default function StatsInput({ onAnalysisComplete }) {
             {homeStatsCount >= 10 && " ✓"}
             {homeStatsCount > 0 && homeStatsCount < 5 && " — formato não reconhecido"}
           </div>
+
+          {homeText.length > 10 && homeStatsCount > 0 && (
+            <div className="text-xs text-slate-300 mt-2 p-2.5 bg-slate-950/80 rounded-lg border border-slate-800 space-y-1 font-mono">
+              <p className="font-bold text-emerald-400 font-sans">Prévia da extração (verifique se está correto):</p>
+              <p>Goals: time={parsedHome.goals?.t ?? "—"} cedido={parsedHome.goals?.c ?? "—"}</p>
+              <p>Corners: time={parsedHome.corners?.t ?? "—"} cedido={parsedHome.corners?.c ?? "—"}</p>
+              <p>Fouls: time={parsedHome.fouls?.t ?? "—"} cedido={parsedHome.fouls?.c ?? "—"}</p>
+            </div>
+          )}
         </div>
         <div>
           <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -146,6 +160,15 @@ export default function StatsInput({ onAnalysisComplete }) {
             {awayStatsCount >= 10 && " ✓"}
             {awayStatsCount > 0 && awayStatsCount < 5 && " — formato não reconhecido"}
           </div>
+
+          {awayText.length > 10 && awayStatsCount > 0 && (
+            <div className="text-xs text-slate-300 mt-2 p-2.5 bg-slate-950/80 rounded-lg border border-slate-800 space-y-1 font-mono">
+              <p className="font-bold text-emerald-400 font-sans">Prévia da extração (verifique se está correto):</p>
+              <p>Goals: time={parsedAway.goals?.t ?? "—"} cedido={parsedAway.goals?.c ?? "—"}</p>
+              <p>Corners: time={parsedAway.corners?.t ?? "—"} cedido={parsedAway.corners?.c ?? "—"}</p>
+              <p>Fouls: time={parsedAway.fouls?.t ?? "—"} cedido={parsedAway.fouls?.c ?? "—"}</p>
+            </div>
+          )}
         </div>
       </div>
 

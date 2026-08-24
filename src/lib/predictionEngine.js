@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════
-// PREDICTION ENGINE V2.1 — MOTOR AUTÔNOMO RE-CALIBRADO COM VERIFICAÇÃO GREEN/RED
+// PREDICTION ENGINE V2.2 — MOTOR AUTÔNOMO COM PARSER CORRIGIDO E LINHAS COMERCIAIS UNIFICADAS
 // ══════════════════════════════════════════════════════════════
 
 const STAT_MAP = {
@@ -46,7 +46,7 @@ export const COMMERCIAL_LINES = {
   shots_target_team:  [3.5, 4.5, 5.5],
   total_shots_total:  [21.5, 23.5, 25.5, 27.5],
   total_shots_team:   [10.5, 12.5, 14.5],
-  saves_total:        [4.5, 5.5, 6.5, 7.5],
+  saves_total:        [2.5, 3.5, 4.5, 5.5, 6.5, 7.5],
   saves_team:         [2.5, 3.5, 4.5],
   fouls_total:        [21.5, 23.5, 25.5, 27.5],
   fouls_team:         [10.5, 12.5, 14.5],
@@ -59,10 +59,16 @@ export function parseStatsHubText(text) {
 
   function extrairMedias(line) {
     const numbers = line.match(/\d+(?:\.\d+)?/g);
-    if (!numbers || numbers.length < 2) return null;
+    if (!numbers || numbers.length < 3) {
+      console.warn("Linha de médias com menos de 3 números:", line);
+      return null;
+    }
+    // numbers[0] = média total (soma dos dois times) — DESCARTAR
+    // numbers[1] = média do time (t) — usar
+    // numbers[2] = média cedida (c) — usar
     return {
-      t: parseFloat(numbers[0]),
-      c: parseFloat(numbers[1]),
+      t: parseFloat(numbers[1]),
+      c: parseFloat(numbers[2]),
     };
   }
 
@@ -121,8 +127,7 @@ export function pesosDinamicos(componentes) {
   }
   if (Object.keys(validos).length === 0) return 1.0;
   const totalPeso = Object.values(validos).reduce((s, [p]) => s + p, 0);
-  const icRaw = Object.values(validos).reduce((s, [p, v]) => s + (p / totalPeso) * v, 0);
-  return 1.0 + (icRaw - 1.0) * 0.40;
+  return Object.values(validos).reduce((s, [p, v]) => s + (p / totalPeso) * v, 0);
 }
 
 // ── Log-Gamma (Aproximação Lanczos para Binomial Negativa) ──
@@ -220,7 +225,7 @@ export function sinalBTTS(p) {
 
 // ── Market 1: Corners ──
 export function calcCorners(atk, def_, isHome = false) {
-  const base = ancora(g(atk, "corners"), g(def_, "corners", "c")) * 0.90;
+  const base = ancora(g(atk, "corners"), g(def_, "corners", "c"));
 
   const ofensivos = {
     shots_on_target:   [0.25, indice(g(atk, "shots_on_target"),   g(def_, "shots_on_target",   "c"))],
@@ -295,7 +300,7 @@ export function calcGols(atk, def_, isHome = false) {
 
 // ── Market 3: Shots on Target ──
 function calcShotsOnTarget(atk, def_, isHome = false) {
-  const base = ancora(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c")) * 0.92;
+  const base = ancora(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c"));
 
   const ofensivos = {
     shots_in_box:       [0.40, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],
@@ -329,7 +334,7 @@ function calcShotsOnTarget(atk, def_, isHome = false) {
 function calcCartoes(atk, def_, isHome = false) {
   const baseMedia = ancora(g(atk, "cards"), g(def_, "cards", "c"));
   const baseMax = Math.max(g(atk, "cards"), g(def_, "cards", "c"));
-  const base = (baseMedia * 0.85 + baseMax * 0.15) * 0.90;
+  const base = baseMedia * 0.85 + baseMax * 0.15;
 
   const fatores = {
     yellow_hist:   [0.35, indice(g(atk, "yellow_cards"), Math.max(g(def_, "yellow_cards", "c"), 0.01))],
@@ -352,7 +357,7 @@ function calcCartoes(atk, def_, isHome = false) {
 
 // ── Market 5: Faltas ──
 function calcFaltas(atk, def_) {
-  const base = ancora(g(atk, "fouls"), g(def_, "fouls", "c")) * 1.55;
+  const base = ancora(g(atk, "fouls"), g(def_, "fouls", "c"));
   const fatores = {
     fouls:         [0.40, indice(g(atk, "fouls"),         g(def_, "fouls",         "c"))],
     tackles:       [0.30, indice(g(atk, "tackles"),       g(def_, "tackles",       "c"))],
@@ -368,7 +373,7 @@ function calcFaltas(atk, def_) {
 
 // ── Market 6: Defesas do Goleiro ──
 function calcSaves(atk, def_) {
-  const base = ancora(g(def_, "gk_saves", "t"), g(atk, "shots_on_target", "t") * 0.65) * 0.60;
+  const base = ancora(g(def_, "gk_saves", "t"), g(atk, "shots_on_target", "c"));
 
   const fatores = {
     shots_on_target: [0.45, indice(g(atk, "shots_on_target"), g(def_, "shots_on_target", "c"))],
@@ -386,7 +391,7 @@ function calcSaves(atk, def_) {
 
 // ── Market 7: Chutes Totais ──
 function calcTotalShots(atk, def_, isHome = false) {
-  const base = ancora(g(atk, "total_shots"), g(def_, "total_shots", "c")) * 0.72;
+  const base = ancora(g(atk, "total_shots"), g(def_, "total_shots", "c"));
 
   const fatores = {
     total_shots:     [0.40, indice(g(atk, "total_shots"),     g(def_, "total_shots",     "c"))],
@@ -611,6 +616,19 @@ export function avaliarPalpiteExplicit(mercadoKey, palpiteObj, realResults) {
   };
 }
 
+// ── Seleção da Melhor Linha Comercial para Unificação das Apostas ──
+export function melhorLinhaComercial(valor, linhasDisponiveis, probFn = poissonOver) {
+  let melhor = null;
+  for (const linha of linhasDisponiveis) {
+    const prob = probFn(valor, linha);
+    const distancia = Math.abs(prob - 0.5);
+    if (!melhor || distancia > melhor.distancia) {
+      melhor = { linha, prob, distancia };
+    }
+  }
+  return melhor;
+}
+
 // ── Full match analysis (100% Autônomo com Palpites Explícitos para TODOS os mercados) ──
 export function analisarJogo(statsCasa, statsFora) {
   const corners_casa = calcCorners(statsCasa, statsFora, true);
@@ -643,6 +661,19 @@ export function analisarJogo(statsCasa, statsFora) {
   const xsaves_total = Math.round((saves_casa.value + saves_fora.value) * 100) / 100;
   const xtotalshots_total = Math.round((total_shots_casa.value + total_shots_fora.value) * 100) / 100;
 
+  // Seleção das melhores linhas comerciais padronizadas via COMMERCIAL_LINES
+  const melhorGolsTotal = melhorLinhaComercial(xg_total, COMMERCIAL_LINES.goals_total);
+  const melhorGolsCasa = melhorLinhaComercial(gols_casa.value, COMMERCIAL_LINES.goals_team);
+  const melhorGolsFora = melhorLinhaComercial(gols_fora.value, COMMERCIAL_LINES.goals_team);
+  const melhorCornersTotal = melhorLinhaComercial(xc_total, COMMERCIAL_LINES.corners_total);
+  const melhorCornersCasa = melhorLinhaComercial(corners_casa.value, COMMERCIAL_LINES.corners_team);
+  const melhorCornersFora = melhorLinhaComercial(corners_fora.value, COMMERCIAL_LINES.corners_team);
+  const melhorShotsTotal = melhorLinhaComercial(xs_total, COMMERCIAL_LINES.shots_target_total);
+  const melhorCardsTotal = melhorLinhaComercial(xcard_total, COMMERCIAL_LINES.cards_total, (v, l) => negativeBinomialOver(v, l, 4.0));
+  const melhorFoulsTotal = melhorLinhaComercial(xfouls_total, COMMERCIAL_LINES.fouls_total, (v, l) => negativeBinomialOver(v, l, 12.0));
+  const melhorSavesTotal = melhorLinhaComercial(xsaves_total, COMMERCIAL_LINES.saves_total);
+  const melhorTotalShotsTotal = melhorLinhaComercial(xtotalshots_total, COMMERCIAL_LINES.total_shots_total);
+
   // GERAÇÃO DE PALPITES EXPLÍCITOS PARA CADA UM DOS MERCADOS
   const picks_explicitos = {
     pick_1x2: {
@@ -651,81 +682,81 @@ export function analisarJogo(statsCasa, statsFora) {
       odd_justa: resultado.pick_1x2.odd_minima,
     },
     gols_total: {
-      palpite: `Over ${Math.floor(xg_total) + 0.5} Gols`,
-      linha: Math.floor(xg_total) + 0.5,
+      palpite: `Over ${melhorGolsTotal.linha} Gols`,
+      linha: melhorGolsTotal.linha,
       proj: xg_total,
-      prob: poissonOver(xg_total, Math.floor(xg_total) + 0.5),
-      odd_justa: (1 / Math.max(0.01, poissonOver(xg_total, Math.floor(xg_total) + 0.5))).toFixed(2),
+      prob: melhorGolsTotal.prob,
+      odd_justa: (1 / Math.max(0.01, melhorGolsTotal.prob)).toFixed(2),
     },
     gols_casa: {
-      palpite: `Over ${Math.floor(gols_casa.value) + 0.5} Gols Mandante`,
-      linha: Math.floor(gols_casa.value) + 0.5,
+      palpite: `Over ${melhorGolsCasa.linha} Gols Mandante`,
+      linha: melhorGolsCasa.linha,
       proj: gols_casa.value,
-      prob: poissonOver(gols_casa.value, Math.floor(gols_casa.value) + 0.5),
-      odd_justa: (1 / Math.max(0.01, poissonOver(gols_casa.value, Math.floor(gols_casa.value) + 0.5))).toFixed(2),
+      prob: melhorGolsCasa.prob,
+      odd_justa: (1 / Math.max(0.01, melhorGolsCasa.prob)).toFixed(2),
     },
     gols_fora: {
-      palpite: `Over ${Math.floor(gols_fora.value) + 0.5} Gols Visitante`,
-      linha: Math.floor(gols_fora.value) + 0.5,
+      palpite: `Over ${melhorGolsFora.linha} Gols Visitante`,
+      linha: melhorGolsFora.linha,
       proj: gols_fora.value,
-      prob: poissonOver(gols_fora.value, Math.floor(gols_fora.value) + 0.5),
-      odd_justa: (1 / Math.max(0.01, poissonOver(gols_fora.value, Math.floor(gols_fora.value) + 0.5))).toFixed(2),
+      prob: melhorGolsFora.prob,
+      odd_justa: (1 / Math.max(0.01, melhorGolsFora.prob)).toFixed(2),
     },
     corners_total: {
-      palpite: `Over ${Math.floor(xc_total) + 0.5} Escanteios`,
-      linha: Math.floor(xc_total) + 0.5,
+      palpite: `Over ${melhorCornersTotal.linha} Escanteios`,
+      linha: melhorCornersTotal.linha,
       proj: xc_total,
-      prob: poissonOver(xc_total, Math.floor(xc_total) + 0.5),
-      odd_justa: (1 / Math.max(0.01, poissonOver(xc_total, Math.floor(xc_total) + 0.5))).toFixed(2),
+      prob: melhorCornersTotal.prob,
+      odd_justa: (1 / Math.max(0.01, melhorCornersTotal.prob)).toFixed(2),
     },
     corners_casa: {
-      palpite: `Over ${Math.floor(corners_casa.value) + 0.5} Escanteios Mandante`,
-      linha: Math.floor(corners_casa.value) + 0.5,
+      palpite: `Over ${melhorCornersCasa.linha} Escanteios Mandante`,
+      linha: melhorCornersCasa.linha,
       proj: corners_casa.value,
-      prob: poissonOver(corners_casa.value, Math.floor(corners_casa.value) + 0.5),
-      odd_justa: (1 / Math.max(0.01, poissonOver(corners_casa.value, Math.floor(corners_casa.value) + 0.5))).toFixed(2),
+      prob: melhorCornersCasa.prob,
+      odd_justa: (1 / Math.max(0.01, melhorCornersCasa.prob)).toFixed(2),
     },
     corners_fora: {
-      palpite: `Over ${Math.floor(corners_fora.value) + 0.5} Escanteios Visitante`,
-      linha: Math.floor(corners_fora.value) + 0.5,
+      palpite: `Over ${melhorCornersFora.linha} Escanteios Visitante`,
+      linha: melhorCornersFora.linha,
       proj: corners_fora.value,
-      prob: poissonOver(corners_fora.value, Math.floor(corners_fora.value) + 0.5),
-      odd_justa: (1 / Math.max(0.01, poissonOver(corners_fora.value, Math.floor(corners_fora.value) + 0.5))).toFixed(2),
+      prob: melhorCornersFora.prob,
+      odd_justa: (1 / Math.max(0.01, melhorCornersFora.prob)).toFixed(2),
     },
     shots_total: {
-      palpite: `Over ${Math.floor(xs_total) + 0.5} Chutes no Gol`,
-      linha: Math.floor(xs_total) + 0.5,
+      palpite: `Over ${melhorShotsTotal.linha} Chutes no Gol`,
+      linha: melhorShotsTotal.linha,
       proj: xs_total,
-      prob: poissonOver(xs_total, Math.floor(xs_total) + 0.5),
-      odd_justa: (1 / Math.max(0.01, poissonOver(xs_total, Math.floor(xs_total) + 0.5))).toFixed(2),
+      prob: melhorShotsTotal.prob,
+      odd_justa: (1 / Math.max(0.01, melhorShotsTotal.prob)).toFixed(2),
     },
     cards_total: {
-      palpite: `Over ${Math.floor(xcard_total) + 0.5} Cartões`,
-      linha: Math.floor(xcard_total) + 0.5,
+      palpite: `Over ${melhorCardsTotal.linha} Cartões`,
+      linha: melhorCardsTotal.linha,
       proj: xcard_total,
-      prob: negativeBinomialOver(xcard_total, Math.floor(xcard_total) + 0.5, 4.0),
-      odd_justa: (1 / Math.max(0.01, negativeBinomialOver(xcard_total, Math.floor(xcard_total) + 0.5, 4.0))).toFixed(2),
+      prob: melhorCardsTotal.prob,
+      odd_justa: (1 / Math.max(0.01, melhorCardsTotal.prob)).toFixed(2),
     },
     fouls_total: {
-      palpite: `Over ${Math.floor(xfouls_total) + 0.5} Faltas`,
-      linha: Math.floor(xfouls_total) + 0.5,
+      palpite: `Over ${melhorFoulsTotal.linha} Faltas`,
+      linha: melhorFoulsTotal.linha,
       proj: xfouls_total,
-      prob: negativeBinomialOver(xfouls_total, Math.floor(xfouls_total) + 0.5, 12.0),
-      odd_justa: (1 / Math.max(0.01, negativeBinomialOver(xfouls_total, Math.floor(xfouls_total) + 0.5, 12.0))).toFixed(2),
+      prob: melhorFoulsTotal.prob,
+      odd_justa: (1 / Math.max(0.01, melhorFoulsTotal.prob)).toFixed(2),
     },
     saves_total: {
-      palpite: `Over ${Math.floor(xsaves_total) + 0.5} Defesas Goleiro`,
-      linha: Math.floor(xsaves_total) + 0.5,
+      palpite: `Over ${melhorSavesTotal.linha} Defesas Goleiro`,
+      linha: melhorSavesTotal.linha,
       proj: xsaves_total,
-      prob: poissonOver(xsaves_total, Math.floor(xsaves_total) + 0.5),
-      odd_justa: (1 / Math.max(0.01, poissonOver(xsaves_total, Math.floor(xsaves_total) + 0.5))).toFixed(2),
+      prob: melhorSavesTotal.prob,
+      odd_justa: (1 / Math.max(0.01, melhorSavesTotal.prob)).toFixed(2),
     },
     totalshots_total: {
-      palpite: `Over ${Math.floor(xtotalshots_total) + 0.5} Chutes Totais`,
-      linha: Math.floor(xtotalshots_total) + 0.5,
+      palpite: `Over ${melhorTotalShotsTotal.linha} Chutes Totais`,
+      linha: melhorTotalShotsTotal.linha,
       proj: xtotalshots_total,
-      prob: poissonOver(xtotalshots_total, Math.floor(xtotalshots_total) + 0.5),
-      odd_justa: (1 / Math.max(0.01, poissonOver(xtotalshots_total, Math.floor(xtotalshots_total) + 0.5))).toFixed(2),
+      prob: melhorTotalShotsTotal.prob,
+      odd_justa: (1 / Math.max(0.01, melhorTotalShotsTotal.prob)).toFixed(2),
     },
     btts: {
       palpite: resultado.p_btts >= 0.50 ? "Ambas Marcam: SIM" : "Ambas Marcam: NÃO",

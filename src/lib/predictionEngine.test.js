@@ -17,6 +17,34 @@ import {
   COMMERCIAL_LINES,
 } from "./predictionEngine";
 
+describe("parseStatsHubText — dados reais do StatsHub", () => {
+  it("extrai corretamente Goals de uma amostra real colada", () => {
+    const texto = `Stat Type	
+H
+2-0
+24 May
+Goals
+2.30	1.10	1.20	
+2
+0	
+1
+1`;
+    const stats = parseStatsHubText(texto);
+    expect(stats.goals.t).toBeCloseTo(1.10, 2);
+    expect(stats.goals.c).toBeCloseTo(1.20, 2);
+  });
+
+  it("extrai corretamente Fouls de uma amostra real colada", () => {
+    const texto = `Fouls
+20.10	10.40	9.70	
+13
+6`;
+    const stats = parseStatsHubText(texto);
+    expect(stats.fouls.t).toBeCloseTo(10.40, 2);
+    expect(stats.fouls.c).toBeCloseTo(9.70, 2);
+  });
+});
+
 describe("Prediction Engine V2 — Primitivas Matemáticas e Estatísticas", () => {
   it("ancora() calcula a média entre ataque feito e defesa cedida", () => {
     expect(ancora(2.0, 1.0)).toBe(1.5);
