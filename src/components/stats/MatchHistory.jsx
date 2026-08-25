@@ -8,7 +8,7 @@ export default function MatchHistory({ onSelectMatch }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    base44.entities.Match.list("-created_date", 50).then(setMatches).finally(() => setLoading(false));
+    base44.entities.Match.list("-created_date", 500).then(setMatches).finally(() => setLoading(false));
   }, []);
 
   if (loading) {

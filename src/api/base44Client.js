@@ -12,7 +12,7 @@ function createEntityClient(tableName) {
       return row;
     },
 
-    async list(sort = "-created_date", limit = 200) {
+    async list(sort = "-created_date", limit = 500) {
       const desc = sort.startsWith("-");
       const col = sort.replace("-", "");
       const { data: rows, error } = await supabase

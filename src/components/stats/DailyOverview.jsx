@@ -78,7 +78,7 @@ export default function DailyOverview() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    base44.entities.Match.list("-date", 100).then(setMatches).finally(() => setLoading(false));
+    base44.entities.Match.list("-date", 500).then(setMatches).finally(() => setLoading(false));
   }, []);
 
   if (loading) {
