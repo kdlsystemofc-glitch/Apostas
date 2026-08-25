@@ -257,14 +257,18 @@ export default function CalibrationView() {
         let homeStats = m.home_stats;
         let awayStats = m.away_stats;
 
-        if (typeof m.home_text === "string" && m.home_text.trim().length > 10) {
-          homeStats = parseStatsHubText(m.home_text);
+        const rawHome = m.home_stats?._raw_text || m.home_text;
+        if (typeof rawHome === "string" && rawHome.trim().length > 10) {
+          homeStats = parseStatsHubText(rawHome);
+          if (m.home_stats?._raw_text) homeStats._raw_text = m.home_stats._raw_text;
         } else {
           homeStats = fixLegacyStats(m.home_stats);
         }
 
-        if (typeof m.away_text === "string" && m.away_text.trim().length > 10) {
-          awayStats = parseStatsHubText(m.away_text);
+        const rawAway = m.away_stats?._raw_text || m.away_text;
+        if (typeof rawAway === "string" && rawAway.trim().length > 10) {
+          awayStats = parseStatsHubText(rawAway);
+          if (m.away_stats?._raw_text) awayStats._raw_text = m.away_stats._raw_text;
         } else {
           awayStats = fixLegacyStats(m.away_stats);
         }

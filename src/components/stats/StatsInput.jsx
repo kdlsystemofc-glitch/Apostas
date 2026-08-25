@@ -50,14 +50,16 @@ export default function StatsInput({ onAnalysisComplete }) {
       // Análise 100% Autônoma pelo Motor Estatístico sem interferência externa
       const results = analisarJogo(homeStats, awayStats);
 
+      // Salva texto bruto dentro do objeto jsonb home_stats e away_stats
+      homeStats._raw_text = homeText.trim();
+      awayStats._raw_text = awayText.trim();
+
       const match = await base44.entities.Match.create({
         home_team: homeTeam.trim(),
         away_team: awayTeam.trim(),
         date: matchDate,
         home_stats: homeStats,
         away_stats: awayStats,
-        home_text: homeText.trim(),
-        away_text: awayText.trim(),
         results,
         status: "pending",
       });
