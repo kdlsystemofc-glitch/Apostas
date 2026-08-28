@@ -42,6 +42,77 @@ Goals
     expect(stats._jogos_header[1]).toEqual({ mando: "A", placar: "1-1", data: "17 May" });
   });
 
+  it("extrai perfeitamente a sequência mista de 20 jogos H/A do Fulham", () => {
+    const fulhamHeader = `Stat Type	
+H
+2-0
+24 May
+A
+1-1
+17 May
+H
+3-1
+10 May
+A
+0-1
+03 May
+H
+2-2
+26 Apr
+A
+1-2
+19 Apr
+A
+0-3
+12 Apr
+H
+1-0
+05 Apr
+A
+2-1
+29 Mar
+H
+3-0
+15 Mar
+H
+1-1
+08 Mar
+H
+2-0
+01 Mar
+A
+1-3
+22 Feb
+A
+0-0
+15 Feb
+A
+1-1
+08 Feb
+H
+2-1
+01 Feb
+A
+0-2
+25 Jan
+H
+3-1
+18 Jan
+A
+1-0
+11 Jan
+H
+2-0
+04 Jan
+Goals
+2.50	1.30	1.20`;
+
+    const stats = parseStatsHubText(fulhamHeader);
+    expect(stats._jogos_header).toHaveLength(20);
+    const mandos = stats._jogos_header.map(j => j.mando).join(" ");
+    expect(mandos).toBe("H A H A H A A H A H H H A A A H A H A H");
+  });
+
   it("extrai valores jogo-a-jogo (historico), media_casa, media_recente e desvio_padrao", () => {
     const texto = `Stat Type	
 H

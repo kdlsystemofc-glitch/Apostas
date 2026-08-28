@@ -2,6 +2,17 @@
 
 Todas as alterações notáveis no projeto **Sports Predictor** serão documentadas neste arquivo.
 
+## [2.4.0] - 2026-08-28 — VERSÃO V2.4 (ENRIQUECIMENTO DE PARSER, HISTÓRICO H/A E NOTA DE ARQUITETURA DE DECOMPOSIÇÃO)
+
+### 🚀 Destaques da Versão V2.4
+- **Novo:** Parser Estendido (`parseStatsHubText`) com extração de cabeçalho de jogos (`_jogos_header`), mandos `H`/`A`, placares, datas e histórico jogo-a-jogo (`historico`).
+- **Novo:** Cálculo de estatísticas descritivas do histórico: `media_casa`, `media_fora`, `media_recente` (decaimento exponencial $0.95^k$) e `desvio_padrao` por estatística.
+- **Validação:** Testes unitários com sequências mistas de 20 jogos (ex: Fulham `H A H A H A A H A H H H A A A H A H A H`).
+- **Nota de Arquitetura em Decomposição Multiplicativa Taxa x Volume:**
+  Ao calcular previsões derivadas (como $\text{xCorners} = \text{taxa\_cantos\_por\_chute} \times \text{xTotalShots}$), previsões extremas de volume (como times com médias atípicas de 28+ chutes) devem ser limitadas/capadas (ex: clamp max 18 chutes) para evitar a amplificação desastrosa de erro quadrático out-of-sample provocada por outliers.
+
+---
+
 ## [2.3.0] - 2026-08-24 — VERSÃO V2.3 (REGRESSÃO MULTIVARIADA OUT-OF-SAMPLE & TRATAMENTO DE CONFIABILIDADE)
 
 ### 🚀 Destaques da Versão V2.3

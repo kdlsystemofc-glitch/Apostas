@@ -73,13 +73,15 @@ export function extrairCabecalhoJogos(text) {
   while (i < lines.length && !lines[i].toLowerCase().includes("stat type")) i++;
   i++;
 
+  const regexPlacar = /\d+\s*[-–—:]\s*\d+/;
+
   while (i < lines.length) {
     const linha = lines[i].trim();
     if (linha === "H" || linha === "A") {
       const mando = linha;
       const placar = lines[i + 1]?.trim() || null;
       const data = lines[i + 2]?.trim() || null;
-      if (placar && placar.includes("-")) {
+      if (placar && regexPlacar.test(placar)) {
         jogos.push({ mando, placar, data });
         i += 3;
         continue;
