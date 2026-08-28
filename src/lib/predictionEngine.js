@@ -369,12 +369,9 @@ export function calcCorners(atk, def_, isHome = false) {
   const id_ = pesosDinamicos(defensivos);
   const ic = 0.50 * io + 0.50 * id_;
   const raw = base * ic;
+  // Removido multiplicador de mando — "t" em home_stats/away_stats já é específico de casa/fora,
+  // pois os dados são colados com o filtro do StatsHub por mando ("Home Matches Only" / "Away Matches Only").
   let xc = raw;
-  if (isHome) {
-    xc *= 1.03;
-  } else {
-    xc *= 0.97;
-  }
 
   return {
     value: Math.round(xc * 100) / 100,
@@ -411,12 +408,8 @@ export function calcGols(atk, def_, isHome = false) {
   const id_ = pesosDinamicos(defensivos);
   const ic = 0.50 * io + 0.50 * id_;
   const raw = base * ic;
+  // Removido multiplicador de mando de campo (sem dupla contagem)
   let xg = raw;
-  if (isHome) {
-    xg *= 1.03;
-  } else {
-    xg *= 0.97;
-  }
 
   return {
     value: Math.round(xg * 100) / 100,
@@ -445,12 +438,8 @@ export function calcShotsOnTarget(atk, def_, isHome = false) {
   const id_ = pesosDinamicos(defensivos);
   const ic = 0.50 * io + 0.50 * id_;
   const raw = base * ic;
+  // Removido multiplicador de mando de campo (sem dupla contagem)
   let xs = raw;
-  if (isHome) {
-    xs *= 1.02;
-  } else {
-    xs *= 0.98;
-  }
 
   return {
     value: Math.round(xs * 100) / 100,
@@ -474,10 +463,8 @@ export function calcCartoes(atk, def_, isHome = false) {
 
   const ic = pesosDinamicos(fatores);
   const raw = base * ic;
+  // Removido multiplicador de mando de campo (sem dupla contagem)
   let xc = raw;
-  if (isHome) {
-    xc *= 0.97;
-  }
 
   return {
     value: Math.round(xc * 100) / 100,
@@ -537,12 +524,8 @@ export function calcTotalShots(atk, def_, isHome = false) {
 
   const ic = pesosDinamicos(fatores);
   const raw = base * ic;
+  // Removido multiplicador de mando de campo (sem dupla contagem)
   let xt = raw;
-  if (isHome) {
-    xt *= 1.02;
-  } else {
-    xt *= 0.98;
-  }
   return {
     value: Math.round(xt * 100) / 100,
     value_raw: Math.round(raw * 100) / 100,

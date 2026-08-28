@@ -83,6 +83,12 @@ export default function StatsInput({ onAnalysisComplete }) {
 
   return (
     <div className="space-y-6 bg-slate-900/90 backdrop-blur-md p-6 rounded-xl border border-slate-800 shadow-xl text-white">
+      <div className="text-xs text-slate-300 bg-slate-950/80 p-3 rounded-lg border border-slate-800 flex items-start gap-2 leading-relaxed">
+        <span className="text-amber-400 text-sm shrink-0">ℹ️</span>
+        <div>
+          <strong className="text-emerald-400">Padrão Esperado de Entrada (StatsHub):</strong> Cole o histórico filtrado por mando de campo — selecione <strong>"Home Matches Only"</strong> para o time da casa e <strong>"Away Matches Only"</strong> para o time visitante. O modelo assume que as estatísticas enviadas já são específicas de cada mando.
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">🏠 Time da Casa (mandante)</Label>
