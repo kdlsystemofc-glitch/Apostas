@@ -15,14 +15,21 @@ import {
   calcResultado,
   analisarJogo,
   COMMERCIAL_LINES,
+  extrairCabecalhoJogos,
+  calcularMediaPorMando,
+  mediaComRecencia,
+  desvioPadrao,
 } from "./predictionEngine";
 
-describe("parseStatsHubText — dados reais do StatsHub", () => {
-  it("extrai corretamente Goals de uma amostra real colada", () => {
+describe("parseStatsHubText — dados reais do StatsHub com Histórico", () => {
+  it("extrai corretamente o cabeçalho de jogos (_jogos_header)", () => {
     const texto = `Stat Type	
 H
 2-0
 24 May
+A
+1-1
+17 May
 Goals
 2.30	1.10	1.20	
 2
@@ -30,8 +37,42 @@ Goals
 1
 1`;
     const stats = parseStatsHubText(texto);
+    expect(stats._jogos_header).toHaveLength(2);
+    expect(stats._jogos_header[0]).toEqual({ mando: "H", placar: "2-0", data: "24 May" });
+    expect(stats._jogos_header[1]).toEqual({ mando: "A", placar: "1-1", data: "17 May" });
+  });
+
+  it("extrai valores jogo-a-jogo (historico), media_casa, media_recente e desvio_padrao", () => {
+    const texto = `Stat Type	
+H
+2-0
+24 May
+A
+1-1
+17 May
+H
+3-1
+10 May
+Goals
+2.30	1.10	1.20	
+2
+0	
+1
+1	
+3
+1`;
+    const stats = parseStatsHubText(texto);
     expect(stats.goals.t).toBeCloseTo(1.10, 2);
     expect(stats.goals.c).toBeCloseTo(1.20, 2);
+    expect(stats.goals.historico).toHaveLength(3);
+    expect(stats.goals.historico[0]).toEqual({ t: 2, c: 0 });
+    expect(stats.goals.historico[1]).toEqual({ t: 1, c: 1 });
+    expect(stats.goals.historico[2]).toEqual({ t: 3, c: 1 });
+
+    expect(stats.goals.media_casa).toBeCloseTo(2.5, 1); // (2 + 3) / 2
+    expect(stats.goals.media_fora).toBeCloseTo(1.0, 1); // 1 / 1
+    expect(stats.goals.media_recente).toBeGreaterThan(0);
+    expect(stats.goals.desvio_padrao).toBeGreaterThan(0);
   });
 
   it("extrai corretamente Fouls de uma amostra real colada", () => {

@@ -64,15 +64,78 @@ export const COMMERCIAL_LINES = {
   fouls_team:         [10.5, 12.5, 14.5],
 };
 
+// ── Extração do Cabeçalho de Jogos (H/A, Placar, Data) ──
+export function extrairCabecalhoJogos(text) {
+  const lines = text.trim().split("\n");
+  const jogos = [];
+  let i = 0;
+
+  while (i < lines.length && !lines[i].toLowerCase().includes("stat type")) i++;
+  i++;
+
+  while (i < lines.length) {
+    const linha = lines[i].trim();
+    if (linha === "H" || linha === "A") {
+      const mando = linha;
+      const placar = lines[i + 1]?.trim() || null;
+      const data = lines[i + 2]?.trim() || null;
+      if (placar && placar.includes("-")) {
+        jogos.push({ mando, placar, data });
+        i += 3;
+        continue;
+      }
+    }
+    if (Object.keys(STAT_MAP).some(k => linha.toLowerCase().startsWith(k.toLowerCase()))) {
+      break;
+    }
+    i++;
+  }
+  return jogos;
+}
+
+// ── Estatísticas Descritivas do Histórico ──
+export function calcularMediaPorMando(historico, jogosHeader, mando) {
+  if (!historico || !jogosHeader || historico.length === 0) return null;
+  const valores = historico
+    .filter((_, idx) => jogosHeader[idx]?.mando === mando)
+    .map(valObj => (typeof valObj === "object" ? valObj.t : valObj));
+
+  if (valores.length < 1) return null;
+  return valores.reduce((s, v) => s + v, 0) / valores.length;
+}
+
+export function mediaComRecencia(historico, decaimento = 0.95) {
+  if (!historico || historico.length === 0) return null;
+  let somaPonderada = 0;
+  let somaPesos = 0;
+
+  historico.forEach((valObj, idx) => {
+    const valor = typeof valObj === "object" ? valObj.t : valObj;
+    const peso = Math.pow(decaimento, idx);
+    somaPonderada += valor * peso;
+    somaPesos += peso;
+  });
+
+  return somaPesos > 0 ? somaPonderada / somaPesos : null;
+}
+
+export function desvioPadrao(historico) {
+  if (!historico || historico.length === 0) return 0;
+  const valores = historico.map(valObj => (typeof valObj === "object" ? valObj.t : valObj));
+  const media = valores.reduce((s, v) => s + v, 0) / valores.length;
+  const variancia = valores.reduce((s, v) => s + Math.pow(v - media, 2), 0) / valores.length;
+  return Math.sqrt(variancia);
+}
+
 // ── Parse pasted StatsHub data ──
 export function parseStatsHubText(text) {
   const stats = {};
+  const jogosHeader = extrairCabecalhoJogos(text);
   const lines = text.trim().split("\n");
 
   function extrairMedias(line) {
     const numbers = line.match(/\d+(?:\.\d+)?/g);
     if (!numbers || numbers.length < 3) {
-      console.warn("Linha de médias com menos de 3 números:", line);
       return null;
     }
     return {
@@ -86,18 +149,67 @@ export function parseStatsHubText(text) {
     for (const [label, key] of Object.entries(STAT_MAP)) {
       if (line.toLowerCase() === label.toLowerCase() || line.toLowerCase().startsWith(label.toLowerCase())) {
         let values = null;
+        let lineAvgIdx = -1;
         if (i + 1 < lines.length) {
           values = extrairMedias(lines[i + 1]);
+          if (values) lineAvgIdx = i + 1;
         }
         if (!values) {
           values = extrairMedias(line);
+          if (values) lineAvgIdx = i;
         }
+
         if (values) {
-          stats[key] = values;
+          stats[key] = { ...values };
+
+          // Captura os valores jogo-a-jogo
+          const gameValues = [];
+          let j = lineAvgIdx + 1;
+
+          while (j < lines.length && gameValues.length < (jogosHeader.length || 20)) {
+            const lineJ = lines[j].trim();
+            if (!lineJ) { j++; continue; }
+
+            if (Object.keys(STAT_MAP).some(k => lineJ.toLowerCase().startsWith(k.toLowerCase()) && !lineJ.includes("\t"))) {
+              break;
+            }
+
+            const nums = lineJ.split(/\s+/).map(v => parseFloat(v)).filter(n => !isNaN(n));
+            if (nums.length >= 2) {
+              gameValues.push({ t: nums[0], c: nums[1] });
+              j++;
+            } else if (nums.length === 1) {
+              const lineNext = lines[j + 1]?.trim() || "";
+              const numsNext = lineNext.split(/\s+/).map(v => parseFloat(v)).filter(n => !isNaN(n));
+              if (numsNext.length >= 1) {
+                gameValues.push({ t: nums[0], c: numsNext[0] });
+                j += 2;
+              } else {
+                gameValues.push({ t: nums[0], c: 0 });
+                j++;
+              }
+            } else {
+              j++;
+            }
+          }
+
+          if (gameValues.length > 0) {
+            stats[key].historico = gameValues;
+            if (jogosHeader.length > 0) {
+              stats[key].media_casa = calcularMediaPorMando(gameValues, jogosHeader, "H");
+              stats[key].media_fora = calcularMediaPorMando(gameValues, jogosHeader, "A");
+            }
+            stats[key].media_recente = mediaComRecencia(gameValues, 0.95);
+            stats[key].desvio_padrao = desvioPadrao(gameValues);
+          }
         }
         break;
       }
     }
+  }
+
+  if (jogosHeader.length > 0) {
+    stats._jogos_header = jogosHeader;
   }
 
   return stats;
