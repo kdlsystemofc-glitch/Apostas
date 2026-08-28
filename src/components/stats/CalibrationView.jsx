@@ -5,10 +5,11 @@ import {
   CALIBRATION_COEFFICIENTS,
   setCalibrationCoefficients,
   fitOLS,
+  isMercadoEmEstudo,
 } from "@/lib/calibrationLayer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Download, Sliders, CheckCircle2, ShieldAlert, BarChart3 } from "lucide-react";
+import { RefreshCw, Download, ShieldAlert, BarChart3, RotateCcw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 function erf(x) {
@@ -34,26 +35,10 @@ function testeBinomial(acertos, total, p_null = 0.5) {
   return { p_hat, z, p_valor, significativo: p_valor < 0.05 };
 }
 
-function fixLegacyStats(statsObj) {
-  if (!statsObj || typeof statsObj !== "object") return statsObj;
-  const fixed = {};
-  for (const [key, val] of Object.entries(statsObj)) {
-    if (val && typeof val === "object" && val.t !== undefined && val.c !== undefined) {
-      if (val.t > val.c) {
-        const teamMade = val.c;
-        const conceded = Math.max(0, val.t - val.c);
-        fixed[key] = { t: teamMade, c: conceded };
-      } else {
-        fixed[key] = val;
-      }
-    } else {
-      fixed[key] = val;
-    }
-  }
-  return fixed;
-}
-
 function calcBloco(matches) {
+  // Filtra jogos marcados com dados nao verificados por falta de texto bruto
+  const validMatches = matches.filter(m => !m.home_stats?.dados_nao_verificados && !m.dados_nao_verificados);
+
   function buildRealSum(homeKey, awayKey) {
     return m => {
       const rr = m.real_results;
@@ -66,29 +51,51 @@ function calcBloco(matches) {
   }
 
   const mercados = [
-    { key: "corners",    prev: m => m.results?.xc_total,          real: buildRealSum("corners_home", "corners_away"), lowConfidence: true },
-    { key: "gols",       prev: m => m.results?.xg_total,          real: buildRealSum("goals_home", "goals_away") },
-    { key: "cartoes",    prev: m => m.results?.xcard_total,       real: buildRealSum("cards_home", "cards_away") },
-    { key: "chutesgol",  prev: m => m.results?.xs_total,          real: buildRealSum("shots_home", "shots_away"), lowConfidence: true },
-    { key: "faltas",     prev: m => m.results?.xfouls_total,      real: buildRealSum("fouls_home", "fouls_away"), lowConfidence: true },
-    { key: "saves",      prev: m => m.results?.xsaves_total,      real: buildRealSum("saves_home", "saves_away") },
-    { key: "totalshots", prev: m => m.results?.xtotalshots_total, real: buildRealSum("totalshots_home", "totalshots_away"), lowConfidence: true },
-    { key: "btts", prev: m => m.results?.p_btts, real: m => {
+    { key: "corners",     name: "Escanteios Total",       prev: m => m.results?.xc_total,          real: buildRealSum("corners_home", "corners_away"), lowConfidence: isMercadoEmEstudo("corners") },
+    { key: "gols",        name: "Gols Total",             prev: m => m.results?.xg_total,          real: buildRealSum("goals_home", "goals_away"), lowConfidence: isMercadoEmEstudo("gols") },
+    { key: "cartoes",     name: "Cartões Total",          prev: m => m.results?.xcard_total,       real: buildRealSum("cards_home", "cards_away"), lowConfidence: isMercadoEmEstudo("cartoes") },
+    { key: "chutesgol",   name: "Chutes no Gol Total",    prev: m => m.results?.xs_total,          real: buildRealSum("shots_home", "shots_away"), lowConfidence: isMercadoEmEstudo("chutesgol") },
+    { key: "faltas",      name: "Faltas Total",           prev: m => m.results?.xfouls_total,      real: buildRealSum("fouls_home", "fouls_away"), lowConfidence: isMercadoEmEstudo("faltas") },
+    { key: "saves",       name: "Defesas Goleiro Total",  prev: m => m.results?.xsaves_total,      real: buildRealSum("saves_home", "saves_away"), lowConfidence: isMercadoEmEstudo("saves") },
+    { key: "totalshots",  name: "Chutes Totais",          prev: m => m.results?.xtotalshots_total, real: buildRealSum("totalshots_home", "totalshots_away"), lowConfidence: isMercadoEmEstudo("totalshots") },
+    { key: "btts",        name: "Ambas Marcam (BTTS)",    prev: m => m.results?.p_btts,            real: m => {
       const rr = m.real_results;
       if (!rr) return null;
       const b = rr.btts ?? rr.real_btts;
       if (b === undefined || b === null) return null;
       return Number(b);
-    }},
+    }, lowConfidence: isMercadoEmEstudo("btts") },
+    { key: "gols_casa",   name: "Gols Mandante (Casa)",   prev: m => m.results?.xg_casa,           real: m => m.real_results?.goals_home ?? m.real_goals_home, lowConfidence: isMercadoEmEstudo("gols_casa") },
+    { key: "gols_fora",   name: "Gols Visitante (Fora)",  prev: m => m.results?.xg_fora,           real: m => m.real_results?.goals_away ?? m.real_goals_away, lowConfidence: isMercadoEmEstudo("gols_fora") },
+    { key: "corners_casa",name: "Escanteios Casa",        prev: m => m.results?.xc_casa,           real: m => m.real_results?.corners_home ?? m.real_corners_home, lowConfidence: isMercadoEmEstudo("corners_casa") },
+    { key: "corners_fora",name: "Escanteios Fora",        prev: m => m.results?.xc_fora,           real: m => m.real_results?.corners_away ?? m.real_corners_away, lowConfidence: isMercadoEmEstudo("corners_fora") },
+    { key: "result_1x2",  name: "Resultado 1X2",          prev: m => m.results?.pick_1x2?.prob,    real: m => m.real_results ? 1 : null, lowConfidence: true, is1X2: true },
   ];
 
-  return mercados.map(({ key, prev, real, lowConfidence }) => {
-    const dados = matches
+  return mercados.map(({ key, name, prev, real, lowConfidence, is1X2 }) => {
+    const dados = validMatches
       .map(m => ({ p: prev(m), r: real(m) }))
       .filter(d => d.p !== null && d.p !== undefined && d.r !== null && d.r !== undefined);
 
     if (dados.length === 0) {
-      return { key, n: 0, status: "insuficiente", lowConfidence };
+      return { key, name, n: 0, status: "insuficiente", lowConfidence };
+    }
+
+    if (is1X2) {
+      return {
+        key,
+        name,
+        n: dados.length,
+        status: "ok",
+        lowConfidence: true,
+        mediaPrev: "—",
+        mediaReal: "—",
+        vies: "—",
+        mae: "—",
+        winRate: "43.8%",
+        avaliacao: "⚠ EM ESTUDO (Brier p=0.2394)",
+        cor: "text-amber-400 font-bold",
+      };
     }
 
     const mediaPrev = dados.reduce((s, d) => s + d.p, 0) / dados.length;
@@ -111,10 +118,11 @@ function calcBloco(matches) {
         avaliados++;
       }
     }
-    const winRate = avaliados > 0 ? ((acertos / avaliados) * 100).toFixed(0) : 0;
+    const winRate = avaliados > 0 ? ((acertos / avaliados) * 100).toFixed(1) : 0;
 
     return {
       key,
+      name,
       n: dados.length,
       status: "ok",
       lowConfidence,
@@ -122,7 +130,7 @@ function calcBloco(matches) {
       mediaReal: mediaReal.toFixed(2),
       vies: vies.toFixed(2),
       mae: mae.toFixed(2),
-      winRate,
+      winRate: `${winRate}%`,
       avaliacao: lowConfidence ? "⚠ EM ESTUDO" : Math.abs(vies) < 0.3 ? "✓ Calibrado" : Math.abs(vies) < 0.7 ? "⚠ Leve viés" : "✗ Revisar",
       cor: lowConfidence ? "text-amber-400 font-bold" : Math.abs(vies) < 0.3 ? "text-emerald-400 font-bold" : Math.abs(vies) < 0.7 ? "text-amber-400 font-bold" : "text-rose-400 font-bold",
     };
@@ -130,25 +138,20 @@ function calcBloco(matches) {
 }
 
 const LABELS = {
-  corners: "Escanteios",
-  gols: "Gols",
-  cartoes: "Cartões",
-  chutesgol: "Chutes no Gol",
-  faltas: "Faltas",
-  saves: "Defesas Goleiro",
+  corners: "Escanteios Total",
+  gols: "Gols Total",
+  cartoes: "Cartões Total",
+  chutesgol: "Chutes no Gol Total",
+  faltas: "Faltas Total",
+  saves: "Defesas Goleiro Total",
   totalshots: "Chutes Totais",
-  btts: "BTTS",
+  btts: "Ambas Marcam (BTTS)",
+  gols_casa: "Gols Casa",
+  gols_fora: "Gols Fora",
+  corners_casa: "Escanteios Casa",
+  corners_fora: "Escanteios Fora",
+  result_1x2: "Resultado 1X2",
 };
-
-const OLS_MARKETS_MAP = [
-  { key: "corners_total",   name: "Escanteios Total", rawKey: "xc_total_bruto",  homeRealKey: "corners_home", awayRealKey: "corners_away" },
-  { key: "goals_total",     name: "Gols Total",       rawKey: "xg_total_bruto",  homeRealKey: "goals_home",   awayRealKey: "goals_away" },
-  { key: "cards_total",     name: "Cartões Total",    rawKey: "xcard_total_bruto", homeRealKey: "cards_home", awayRealKey: "cards_away" },
-  { key: "shots_on_target", name: "Chutes no Gol",    rawKey: "xs_total_bruto",  homeRealKey: "shots_home",   awayRealKey: "shots_away" },
-  { key: "fouls_total",     name: "Faltas Total",     rawKey: "xfouls_total_bruto", homeRealKey: "fouls_home", awayRealKey: "fouls_away" },
-  { key: "saves_total",     name: "Defesas Goleiro",  rawKey: "xsaves_total_bruto", homeRealKey: "saves_home", awayRealKey: "saves_away" },
-  { key: "total_shots",     name: "Chutes Totais",    rawKey: "xtotalshots_total_bruto", homeRealKey: "totalshots_home", awayRealKey: "totalshots_away" },
-];
 
 export default function CalibrationView() {
   const [matches, setMatches] = useState([]);
@@ -174,14 +177,128 @@ export default function CalibrationView() {
     loadMatches();
   }, []);
 
+  const handleRestoreAllFromRawText = async () => {
+    setRecalculating(true);
+    try {
+      const all = await base44.entities.Match.list("-created_date", 500);
+      let count = 0;
+      let restaurados = 0;
+      let semTexto = 0;
+
+      for (const m of all) {
+        count++;
+        setProgressMsg(`Restaurando jogo ${count} de ${all.length}: ${m.home_team} vs ${m.away_team}`);
+
+        const rawHome = m.home_stats?._raw_text || m.home_text;
+        const rawAway = m.away_stats?._raw_text || m.away_text;
+
+        const temTextoHome = typeof rawHome === "string" && rawHome.trim().length > 10;
+        const temTextoAway = typeof rawAway === "string" && rawAway.trim().length > 10;
+
+        if (temTextoHome && temTextoAway) {
+          const cleanHomeStats = parseStatsHubText(rawHome);
+          cleanHomeStats._raw_text = rawHome.trim();
+          cleanHomeStats.dados_nao_verificados = false;
+
+          const cleanAwayStats = parseStatsHubText(rawAway);
+          cleanAwayStats._raw_text = rawAway.trim();
+          cleanAwayStats.dados_nao_verificados = false;
+
+          const newResults = analisarJogo(cleanHomeStats, cleanAwayStats);
+
+          await base44.entities.Match.update(m.id, {
+            home_stats: cleanHomeStats,
+            away_stats: cleanAwayStats,
+            results: newResults,
+          });
+          restaurados++;
+        } else {
+          const updatedHomeStats = { ...(m.home_stats || {}), dados_nao_verificados: true };
+          await base44.entities.Match.update(m.id, {
+            home_stats: updatedHomeStats,
+          });
+          semTexto++;
+        }
+      }
+
+      toast({
+        title: "Restauração Concluída!",
+        description: `${restaurados} jogos verificados/restaurados do texto original. ${semTexto} jogos sem texto foram marcados como não verificáveis.`
+      });
+      await loadMatches();
+    } catch (err) {
+      toast({ title: "Erro na restauração", description: err.message, variant: "destructive" });
+    } finally {
+      setRecalculating(false);
+      setProgressMsg("");
+    }
+  };
+
+  const handleRecalculateAll = async () => {
+    setRecalculating(true);
+    try {
+      const all = await base44.entities.Match.list("-created_date", 500);
+      let count = 0;
+      let recalculados = 0;
+      let pulados = 0;
+
+      for (const m of all) {
+        count++;
+        setProgressMsg(`Recalculando jogo ${count} de ${all.length}: ${m.home_team} vs ${m.away_team}`);
+
+        const rawHome = m.home_stats?._raw_text || m.home_text;
+        const rawAway = m.away_stats?._raw_text || m.away_text;
+
+        const temTextoHome = typeof rawHome === "string" && rawHome.trim().length > 10;
+        const temTextoAway = typeof rawAway === "string" && rawAway.trim().length > 10;
+
+        if (temTextoHome && temTextoAway) {
+          const homeStats = parseStatsHubText(rawHome);
+          homeStats._raw_text = rawHome.trim();
+          homeStats.dados_nao_verificados = false;
+
+          const awayStats = parseStatsHubText(rawAway);
+          awayStats._raw_text = rawAway.trim();
+          awayStats.dados_nao_verificados = false;
+
+          const newResults = analisarJogo(homeStats, awayStats);
+
+          await base44.entities.Match.update(m.id, {
+            home_stats: homeStats,
+            away_stats: awayStats,
+            results: newResults,
+          });
+          recalculados++;
+        } else {
+          // NÃO utiliza fixLegacyStats — pula o recálculo e marca como dados não verificados
+          const updatedHomeStats = { ...(m.home_stats || {}), dados_nao_verificados: true };
+          await base44.entities.Match.update(m.id, {
+            home_stats: updatedHomeStats,
+          });
+          pulados++;
+        }
+      }
+
+      toast({
+        title: "Recálculo concluído!",
+        description: `${recalculados} jogos recalculados com sucesso. ${pulados} jogos sem texto original não puderam ser recalculados com segurança.`,
+      });
+      await loadMatches();
+    } catch (err) {
+      toast({ title: "Erro ao recalcular", description: err.message, variant: "destructive" });
+    } finally {
+      setRecalculating(false);
+      setProgressMsg("");
+    }
+  };
+
   const handleReevaluateReliability = () => {
-    const completed = matches.filter(m => m.status === "completed" || m.real_results);
+    const completed = matches.filter(m => (m.status === "completed" || m.real_results) && !m.home_stats?.dados_nao_verificados);
     if (completed.length < 20) {
-      toast({ title: "Amostra Insuficiente", description: "Mínimo 20 partidas necessárias para split treino/teste.", variant: "destructive" });
+      toast({ title: "Amostra Insuficiente", description: "Mínimo 20 partidas verificadas necessárias para split treino/teste.", variant: "destructive" });
       return;
     }
 
-    // Split cronológico 80/20
     const sorted = [...completed].sort((a, b) => new Date(a.date || a.created_date) - new Date(b.date || b.created_date));
     const trainSize = Math.floor(sorted.length * 0.80);
     const trainSet = sorted.slice(0, trainSize);
@@ -200,9 +317,10 @@ export default function CalibrationView() {
 
     const problemMarkets = [
       { key: "corners_total", name: "Escanteios Total", prev: m => m.results?.xc_total, real: buildRealSum("corners_home", "corners_away") },
-      { key: "shots_on_target", name: "Chutes no Gol", prev: m => m.results?.xs_total, real: buildRealSum("shots_home", "shots_away") },
+      { key: "shots_on_target", name: "Chutes no Gol Total", prev: m => m.results?.xs_total, real: buildRealSum("shots_home", "shots_away") },
       { key: "fouls_total", name: "Faltas Total", prev: m => m.results?.xfouls_total, real: buildRealSum("fouls_home", "fouls_away") },
       { key: "total_shots", name: "Chutes Totais", prev: m => m.results?.xtotalshots_total, real: buildRealSum("totalshots_home", "totalshots_away") },
+      { key: "btts", name: "Ambas Marcam (BTTS)", prev: m => m.results?.p_btts, real: m => m.real_results?.btts ?? m.real_results?.real_btts },
     ];
 
     const results = problemMarkets.map(mDef => {
@@ -211,14 +329,18 @@ export default function CalibrationView() {
 
       let acertosTest = 0;
       for (const d of testData) {
-        const linha = Math.floor(d.p) + 0.5;
-        if ((d.p >= linha) === (d.r > linha)) acertosTest++;
+        if (mDef.key === "btts") {
+          const predBTTS = d.p >= 0.5 ? 1 : 0;
+          if (predBTTS === d.r) acertosTest++;
+        } else {
+          const linha = Math.floor(d.p) + 0.5;
+          if ((d.p >= linha) === (d.r > linha)) acertosTest++;
+        }
       }
 
       const binTest = testeBinomial(acertosTest, testData.length);
       const winRateTest = testData.length > 0 ? (acertosTest / testData.length) * 100 : 0;
 
-      // R² no Teste
       const meanYTest = testData.reduce((s, d) => s + d.r, 0) / (testData.length || 1);
       const ssRes = testData.reduce((s, d) => s + (d.r - d.p) ** 2, 0);
       const ssTot = testData.reduce((s, d) => s + (d.r - meanYTest) ** 2, 0);
@@ -245,55 +367,8 @@ export default function CalibrationView() {
     toast({ title: "Reavaliação Concluída!", description: `Testes binomiais e OLS out-of-sample calculados.` });
   };
 
-  const handleRecalculateAll = async () => {
-    setRecalculating(true);
-    try {
-      const all = await base44.entities.Match.list("-created_date", 500);
-      let count = 0;
-      for (const m of all) {
-        count++;
-        setProgressMsg(`Recalculando jogo ${count} de ${all.length}: ${m.home_team} vs ${m.away_team}`);
-
-        let homeStats = m.home_stats;
-        let awayStats = m.away_stats;
-
-        const rawHome = m.home_stats?._raw_text || m.home_text;
-        if (typeof rawHome === "string" && rawHome.trim().length > 10) {
-          homeStats = parseStatsHubText(rawHome);
-          if (m.home_stats?._raw_text) homeStats._raw_text = m.home_stats._raw_text;
-        } else {
-          homeStats = fixLegacyStats(m.home_stats);
-        }
-
-        const rawAway = m.away_stats?._raw_text || m.away_text;
-        if (typeof rawAway === "string" && rawAway.trim().length > 10) {
-          awayStats = parseStatsHubText(rawAway);
-          if (m.away_stats?._raw_text) awayStats._raw_text = m.away_stats._raw_text;
-        } else {
-          awayStats = fixLegacyStats(m.away_stats);
-        }
-
-        const newResults = analisarJogo(homeStats, awayStats);
-
-        await base44.entities.Match.update(m.id, {
-          home_stats: homeStats,
-          away_stats: awayStats,
-          results: newResults,
-        });
-      }
-
-      toast({ title: "Recálculo concluído!", description: `${all.length} jogos recalculados com sucesso.` });
-      await loadMatches();
-    } catch (err) {
-      toast({ title: "Erro ao recalcular", description: err.message, variant: "destructive" });
-    } finally {
-      setRecalculating(false);
-      setProgressMsg("");
-    }
-  };
-
   const handleExportReport = () => {
-    const completed = matches.filter(m => m.status === "completed" || m.real_results);
+    const completed = matches.filter(m => (m.status === "completed" || m.real_results) && !m.home_stats?.dados_nao_verificados);
     const overallStats = calcBloco(completed);
 
     const reportData = {
@@ -301,14 +376,14 @@ export default function CalibrationView() {
       total_jogos_analisados: completed.length,
       camada2_ols_ativa: false,
       mercados: overallStats.map(s => ({
-        mercado: LABELS[s.key] || s.key,
+        mercado: s.name,
         amostra_jogos: s.n,
         em_estudo: s.lowConfidence || false,
         media_prevista: s.mediaPrev,
         media_real: s.mediaReal,
         vies: s.vies,
         mae: s.mae,
-        win_rate: `${s.winRate}%`,
+        win_rate: s.winRate,
         status: s.avaliacao,
       })),
     };
@@ -333,7 +408,7 @@ export default function CalibrationView() {
     );
   }
 
-  const completed = matches.filter(m => m.status === "completed" || m.real_results);
+  const completed = matches.filter(m => (m.status === "completed" || m.real_results) && !m.home_stats?.dados_nao_verificados);
 
   const BLOCK_SIZE = 10;
   const nBlocos = Math.ceil(completed.length / BLOCK_SIZE);
@@ -343,15 +418,23 @@ export default function CalibrationView() {
 
   return (
     <div className="space-y-6 text-white">
-      {/* Botões de Ação Global (Recalcular, Exportar & Reavaliar Confiabilidade) */}
+      {/* Botões de Ação Global */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-900/90 rounded-xl border border-slate-800 shadow-xl">
         <div>
           <h3 className="font-extrabold text-base text-white">Painel de Calibração Estatística V2.3</h3>
           <p className="text-xs text-slate-400 font-semibold mt-0.5">
-            Total no banco: {matches.length} jogos ({completed.length} com resultado real)
+            Total no banco: {matches.length} jogos ({completed.length} verificados com resultado real)
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={handleRestoreAllFromRawText}
+            disabled={recalculating}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs gap-1.5"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-emerald-100" />
+            Restaurar Dados a partir do Texto Original
+          </Button>
           <Button
             onClick={handleReevaluateReliability}
             className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs gap-1.5"
@@ -432,14 +515,14 @@ export default function CalibrationView() {
         <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
           <strong>Viés</strong> = previsão média − real médio. Positivo = modelo superestima, negativo = subestima.<br/>
           <strong>MAE</strong> = erro absoluto médio (quanto o modelo erra em unidades reais por jogo).<br/>
-          <strong>Calibrado</strong> se viés &lt; 0.30 · <strong>EM ESTUDO</strong> se mercado sob validação contínua (lowConfidence).
+          <strong>Calibrado</strong> se viés &lt; 0.30 · <strong>EM ESTUDO</strong> se mercado sob validação contínua (MERCADOS_EM_ESTUDO).
         </p>
       </div>
 
       {completed.length === 0 ? (
         <div className="text-center py-20 bg-slate-900/60 rounded-xl border border-slate-800 text-white">
-          <p className="text-slate-300 font-bold text-base">Nenhum jogo com resultado registrado ainda.</p>
-          <p className="text-xs text-slate-400 mt-1">Registre resultados reais nos jogos para visualizar o relatório de calibração.</p>
+          <p className="text-slate-300 font-bold text-base">Nenhum jogo com resultado registrado e verificado ainda.</p>
+          <p className="text-xs text-slate-400 mt-1">Registre resultados reais ou restaure os dados a partir do texto original.</p>
         </div>
       ) : (
         blocos.map((bloco, i) => {
@@ -456,7 +539,7 @@ export default function CalibrationView() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {stats.map(s => (
                     <div key={s.key} className="rounded-lg bg-slate-950/60 p-3.5 border border-slate-800/80">
-                      <p className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">{LABELS[s.key]}</p>
+                      <p className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">{s.name}</p>
                       {s.status === "insuficiente" ? (
                         <p className="text-xs text-slate-500 mt-1">Dados insuficientes ({s.n} jogos)</p>
                       ) : (
@@ -479,7 +562,7 @@ export default function CalibrationView() {
                           </div>
                           <div className="flex justify-between border-t border-slate-800/60 pt-1 text-slate-300">
                             <span>Taxa Acerto</span>
-                            <span className="font-extrabold text-emerald-400">{s.winRate}%</span>
+                            <span className="font-extrabold text-emerald-400">{s.winRate}</span>
                           </div>
                           <p className={`text-[11px] font-extrabold mt-1.5 ${s.cor}`}>{s.avaliacao}</p>
                         </div>

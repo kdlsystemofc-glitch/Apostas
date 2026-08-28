@@ -1,5 +1,6 @@
 import React from "react";
 import { poissonOver, sinalPoisson, sinalPoissonGols, sinalBTTS, COMMERCIAL_LINES, avaliarPalpiteExplicit } from "@/lib/predictionEngine";
+import { isMercadoEmEstudo } from "@/lib/calibrationLayer";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 const colorClasses = {
@@ -56,16 +57,16 @@ export default function BestBetsByMarket({ match }) {
   };
 
   const mercados = [
-    { icon: "🔲", label: "Escanteios Total", key: "corners_total", x: r.xc_total, lines: COMMERCIAL_LINES.corners_total, realKey: "corners_total", lowConfidence: true },
-    { icon: "🔲", label: `Escanteios ${match.home_team}`, key: "corners_casa", x: r.xc_casa, lines: COMMERCIAL_LINES.corners_team, realKey: "corners_home", lowConfidence: true },
-    { icon: "🔲", label: `Escanteios ${match.away_team}`, key: "corners_fora", x: r.xc_fora, lines: COMMERCIAL_LINES.corners_team, realKey: "corners_away", lowConfidence: true },
-    { icon: "⚽", label: "Gols Total", key: "gols_total", x: r.xg_total, lines: COMMERCIAL_LINES.goals_total, sinalFn: sinalPoissonGols, realKey: "goals_total" },
-    { icon: "⚽", label: `Gols ${match.home_team}`, key: "gols_casa", x: r.xg_casa, lines: COMMERCIAL_LINES.goals_team, sinalFn: sinalPoissonGols, realKey: "goals_home", lowConfidence: true },
-    { icon: "⚽", label: `Gols ${match.away_team}`, key: "gols_fora", x: r.xg_fora, lines: COMMERCIAL_LINES.goals_team, sinalFn: sinalPoissonGols, realKey: "goals_away", lowConfidence: true },
-    { icon: "🎯", label: "Chutes no Gol Total", key: "shots_total", x: r.xs_total, lines: COMMERCIAL_LINES.shots_target_total, realKey: "shots_total", lowConfidence: true },
-    { icon: "💥", label: "Chutes Totais", key: "totalshots_total", x: r.xtotalshots_total, lines: COMMERCIAL_LINES.total_shots_total, realKey: "totalshots_total", lowConfidence: true },
-    { icon: "🟨", label: "Cartões Total", key: "cards_total", x: r.xcard_total, lines: COMMERCIAL_LINES.cards_total, realKey: "cards_total" },
-    { icon: "🧤", label: "Defesas Goleiro Total", key: "saves_total", x: r.xsaves_total, lines: COMMERCIAL_LINES.saves_total, realKey: "saves_total" },
+    { icon: "🔲", label: "Escanteios Total", key: "corners_total", x: r.xc_total, lines: COMMERCIAL_LINES.corners_total, realKey: "corners_total", lowConfidence: isMercadoEmEstudo("corners_total") },
+    { icon: "🔲", label: `Escanteios ${match.home_team}`, key: "corners_casa", x: r.xc_casa, lines: COMMERCIAL_LINES.corners_team, realKey: "corners_home", lowConfidence: isMercadoEmEstudo("corners_casa") },
+    { icon: "🔲", label: `Escanteios ${match.away_team}`, key: "corners_fora", x: r.xc_fora, lines: COMMERCIAL_LINES.corners_team, realKey: "corners_away", lowConfidence: isMercadoEmEstudo("corners_fora") },
+    { icon: "⚽", label: "Gols Total", key: "gols_total", x: r.xg_total, lines: COMMERCIAL_LINES.goals_total, sinalFn: sinalPoissonGols, realKey: "goals_total", lowConfidence: isMercadoEmEstudo("goals_total") },
+    { icon: "⚽", label: `Gols ${match.home_team}`, key: "gols_casa", x: r.xg_casa, lines: COMMERCIAL_LINES.goals_team, sinalFn: sinalPoissonGols, realKey: "goals_home", lowConfidence: isMercadoEmEstudo("gols_casa") },
+    { icon: "⚽", label: `Gols ${match.away_team}`, key: "gols_fora", x: r.xg_fora, lines: COMMERCIAL_LINES.goals_team, sinalFn: sinalPoissonGols, realKey: "goals_away", lowConfidence: isMercadoEmEstudo("gols_fora") },
+    { icon: "🎯", label: "Chutes no Gol Total", key: "shots_total", x: r.xs_total, lines: COMMERCIAL_LINES.shots_target_total, realKey: "shots_total", lowConfidence: isMercadoEmEstudo("shots_on_target_total") },
+    { icon: "💥", label: "Chutes Totais", key: "totalshots_total", x: r.xtotalshots_total, lines: COMMERCIAL_LINES.total_shots_total, realKey: "totalshots_total", lowConfidence: isMercadoEmEstudo("total_shots_total") },
+    { icon: "🟨", label: "Cartões Total", key: "cards_total", x: r.xcard_total, lines: COMMERCIAL_LINES.cards_total, realKey: "cards_total", lowConfidence: isMercadoEmEstudo("cards_total") },
+    { icon: "🧤", label: "Defesas Goleiro Total", key: "saves_total", x: r.xsaves_total, lines: COMMERCIAL_LINES.saves_total, realKey: "saves_total", lowConfidence: isMercadoEmEstudo("saves_total") },
     { icon: "🤜", label: "Faltas Total", key: "fouls_total", x: r.xfouls_total, lines: COMMERCIAL_LINES.fouls_total, realKey: "fouls_total", lowConfidence: true, hidden: true },
   ];
 
@@ -81,7 +82,6 @@ export default function BestBetsByMarket({ match }) {
     .filter(m => m.best != null);
 
   const sorted = [...rows].sort((a, b) => b.best.strength - a.best.strength);
-  const candidatosSinalForte = sorted.filter(m => !m.lowConfidence);
 
   const bttsSinal = sinalBTTS(r.p_btts);
   const bttsOddMin = r.p_btts > 0 ? Math.max(1.01, Math.round((1 / r.p_btts) * 100) / 100) : "—";
@@ -143,7 +143,7 @@ export default function BestBetsByMarket({ match }) {
               </div>
             </div>
             <p className="text-[11px] text-amber-400/90 mt-1 leading-snug font-sans bg-amber-950/40 p-2 rounded border border-amber-500/30">
-              O mercado 1X2 está sob validação estatística continuada (p-valor = 0.4578 no teste de permutação Brier Score). A probabilidade é exibida como informação, mas deve ser tratada em observação.
+              O mercado 1X2 está sob validação estatística continuada (p-valor = 0.2394 no teste de permutação Brier Score). A probabilidade é exibida como informação, mas deve ser tratada em observação.
             </p>
           </div>
         )}
@@ -237,7 +237,7 @@ export default function BestBetsByMarket({ match }) {
 
             {m.lowConfidence && (
               <p className="text-[11px] text-amber-400/90 mt-1 leading-snug font-sans bg-amber-950/40 p-2 rounded border border-amber-500/30">
-                Este mercado está sob validação estatística contínua. Com os dados disponíveis até agora (156 jogos), não foi possível confirmar sinal preditivo confiável fora da amostra de treino. A projeção ainda é exibida como informação, mas não deve ser tratada como uma recomendação forte de aposta.
+                Este mercado está sob validação estatística contínua. Com os dados disponíveis até agora, não foi possível confirmar sinal preditivo confiável fora da amostra de treino. A projeção ainda é exibida como informação, mas não deve ser tratada como uma recomendação forte de aposta.
               </p>
             )}
           </div>

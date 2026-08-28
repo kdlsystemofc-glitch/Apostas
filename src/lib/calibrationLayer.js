@@ -1,11 +1,38 @@
 // ══════════════════════════════════════════════════════════════
-// CAMADA DE RECALIBRAÇÃO ESTATÍSTICA (OLS)
-//
-// Corrige o viés sistemático do modelo mecanístico usando regressão
-// linear simples ajustada sobre o histórico real de jogos.
+// CAMADA DE RECALIBRAÇÃO ESTATÍSTICA (OLS) & CONFIABILIDADE DE MERCADOS
 // ══════════════════════════════════════════════════════════════
 
 export const CALIBRATION_ENABLED = false; // Desativado temporariamente para isolar a Camada 1
+
+// Fonte única da verdade de mercados sob validação estatística ("⚠ EM ESTUDO")
+export const MERCADOS_EM_ESTUDO = [
+  "corners_total",
+  "shots_on_target_total",
+  "fouls_total",
+  "total_shots_total",
+  "btts",
+  "goals_home",
+  "goals_away",
+  "corners_home",
+  "corners_away",
+  "result_1x2",
+  // Aliases curtos/chaves de interface
+  "corners",
+  "chutesgol",
+  "faltas",
+  "totalshots",
+  "gols_casa",
+  "gols_fora",
+  "corners_casa",
+  "corners_fora",
+  "1x2",
+  "pick_1x2",
+];
+
+export function isMercadoEmEstudo(key) {
+  if (!key) return false;
+  return MERCADOS_EM_ESTUDO.includes(key);
+}
 
 export const CALIBRATION_COEFFICIENTS = {
   corners_total:      { intercept: 0, slope: 1, fitted_on: 0, r_squared: null },
@@ -38,9 +65,8 @@ export function aplicarCalibracao(valorBruto, mercadoKey) {
 
 // Regressão OLS simples (y = a + bx) — usado pelo script de fit
 export function fitOLS(pares) {
-  // pares = [[valorBruto, valorReal], ...]
   const n = pares.length;
-  if (n < 10) return null; // amostra insuficiente para confiar
+  if (n < 10) return null;
 
   const sumX = pares.reduce((s, [x]) => s + x, 0);
   const sumY = pares.reduce((s, [, y]) => s + y, 0);
@@ -55,19 +81,17 @@ export function fitOLS(pares) {
   const slope = den !== 0 ? num / den : 1;
   const intercept = meanY - slope * meanX;
 
-  // R² (coeficiente de determinação)
   let ssRes = 0, ssTot = 0;
   for (const [x, y] of pares) {
-    const pred = intercept + slope * x;
-    ssRes += (y - pred) ** 2;
+    ssRes += (y - (intercept + slope * x)) ** 2;
     ssTot += (y - meanY) ** 2;
   }
   const rSquared = ssTot !== 0 ? 1 - ssRes / ssTot : 0;
 
   return {
-    intercept: Math.round(intercept * 1000) / 1000,
-    slope: Math.round(slope * 1000) / 1000,
-    fitted_on: n,
+    intercept: Math.round(intercept * 100) / 100,
+    slope: Math.round(slope * 100) / 100,
     r_squared: Math.round(rSquared * 1000) / 1000,
+    fitted_on: n,
   };
 }
