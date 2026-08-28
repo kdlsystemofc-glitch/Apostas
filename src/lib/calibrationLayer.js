@@ -6,6 +6,9 @@ export const CALIBRATION_ENABLED = false; // Desativado temporariamente para iso
 
 // Fonte única da verdade de mercados sob validação estatística ("⚠ EM ESTUDO")
 export const MERCADOS_EM_ESTUDO = [
+  "goals_total",
+  "cards_total",
+  "saves_total",
   "corners_total",
   "shots_on_target_total",
   "fouls_total",
@@ -17,6 +20,9 @@ export const MERCADOS_EM_ESTUDO = [
   "corners_away",
   "result_1x2",
   // Aliases curtos/chaves de interface
+  "gols",
+  "cartoes",
+  "saves",
   "corners",
   "chutesgol",
   "faltas",
@@ -94,4 +100,19 @@ export function fitOLS(pares) {
     r_squared: Math.round(rSquared * 1000) / 1000,
     fitted_on: n,
   };
+}
+
+// ── Classificação de Mercados por Evidência Estatística Rigorosa ──
+export function classificarMercado(r2Test, pValor, nTestes = 12, vies = 0, mae = 0) {
+  const alphaCorrigido = 0.05 / nTestes; // Correção de Bonferroni (0.05 / 12 = 0.004167)
+  const pValNum = typeof pValor === "string" ? parseFloat(pValor) : Number(pValor);
+  const r2Num = typeof r2Test === "string" ? parseFloat(r2Test) : Number(r2Test);
+  const viesNum = typeof vies === "string" ? parseFloat(vies) : Number(vies);
+
+  const temSinalReal = r2Num > 0.10 && pValNum < alphaCorrigido;
+  const acertoFraco = pValNum > 0.30;
+
+  if (temSinalReal) return "✓ VALIDADO (sinal confirmado)";
+  if (acertoFraco && Math.abs(viesNum) < 0.30) return "⚠ Viés baixo, sem sinal discriminativo";
+  return "⚠ EM ESTUDO";
 }

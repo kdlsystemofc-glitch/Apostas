@@ -1,5 +1,5 @@
 import { base44 } from "../src/api/base44Client.js";
-import { isMercadoEmEstudo } from "../src/lib/calibrationLayer.js";
+import { isMercadoEmEstudo, classificarMercado } from "../src/lib/calibrationLayer.js";
 
 // Função para calcular o Intervalo de Confiança 95% de Wilson Score
 function wilsonScoreInterval(k, n) {
@@ -97,15 +97,7 @@ function calcBloco(matches) {
     const winRateStr = `${winRateNum.toFixed(1)}%`;
     const ic95 = wilsonScoreInterval(acertos, dados.length);
     const binTest = testeBinomial(acertos, dados.length);
-
-    let avaliacao = "✗ Revisar";
-    if (lowConfidence) {
-      avaliacao = "⚠ EM ESTUDO";
-    } else if (Math.abs(vies) < 0.35) {
-      avaliacao = "✓ Calibrado";
-    } else if (Math.abs(vies) < 0.70) {
-      avaliacao = "⚠ Leve viés";
-    }
+    const avaliacao = classificarMercado(r2, binTest.pValor, 12, vies, mae);
 
     return {
       key,

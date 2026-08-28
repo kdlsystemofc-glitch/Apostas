@@ -6,6 +6,7 @@ import {
   setCalibrationCoefficients,
   fitOLS,
   isMercadoEmEstudo,
+  classificarMercado,
 } from "@/lib/calibrationLayer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -120,6 +121,16 @@ function calcBloco(matches) {
     }
     const winRate = avaliados > 0 ? ((acertos / avaliados) * 100).toFixed(1) : 0;
 
+    const ssRes = dados.reduce((s, d) => s + (d.r - d.p) ** 2, 0);
+    const ssTot = dados.reduce((s, d) => s + (d.r - mediaReal) ** 2, 0);
+    const r2 = ssTot !== 0 ? 1 - ssRes / ssTot : 0;
+    const binTest = testeBinomial(acertos, dados.length);
+
+    const avaliacaoStr = classificarMercado(r2, binTest.p_valor, 12, vies, mae);
+    const corClass = avaliacaoStr.includes("VALIDADO")
+      ? "text-emerald-400 font-bold"
+      : "text-amber-400 font-bold";
+
     return {
       key,
       name,
@@ -131,8 +142,8 @@ function calcBloco(matches) {
       vies: vies.toFixed(2),
       mae: mae.toFixed(2),
       winRate: `${winRate}%`,
-      avaliacao: lowConfidence ? "⚠ EM ESTUDO" : Math.abs(vies) < 0.3 ? "✓ Calibrado" : Math.abs(vies) < 0.7 ? "⚠ Leve viés" : "✗ Revisar",
-      cor: lowConfidence ? "text-amber-400 font-bold" : Math.abs(vies) < 0.3 ? "text-emerald-400 font-bold" : Math.abs(vies) < 0.7 ? "text-amber-400 font-bold" : "text-rose-400 font-bold",
+      avaliacao: avaliacaoStr,
+      cor: corClass,
     };
   });
 }
