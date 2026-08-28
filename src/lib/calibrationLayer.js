@@ -116,3 +116,28 @@ export function classificarMercado(r2Test, pValor, nTestes = 12, vies = 0, mae =
   if (acertoFraco && Math.abs(viesNum) < 0.30) return "⚠ Viés baixo, sem sinal discriminativo";
   return "⚠ EM ESTUDO";
 }
+
+// ── Regra Estrita de Substituição de Modelo (Proteção de Sinal Binário) ──
+export function decidirSubstituicao(heuristico, candidato) {
+  const heurAcerto = typeof heuristico.acerto === "string" ? parseFloat(heuristico.acerto) : Number(heuristico.acerto || heuristico.winRate || 0);
+  const candAcerto = typeof candidato.acerto === "string" ? parseFloat(candidato.acerto) : Number(candidato.acerto || candidato.winRate || 0);
+
+  const heurR2 = typeof heuristico.r2 === "string" ? parseFloat(heuristico.r2) : Number(heuristico.r2 || heuristico.r2Test || 0);
+  const candR2 = typeof candidato.r2 === "string" ? parseFloat(candidato.r2) : Number(candidato.r2 || candidato.r2Test || 0);
+
+  // NUNCA substituir se o candidato piorar a taxa de acerto em mais de 3%,
+  // mesmo que melhore R²/MAE — a taxa de acerto (decisão binária) é o que importa para apostas.
+  if (candAcerto < heurAcerto - 3.0) {
+    return {
+      substituir: false,
+      motivo: "Candidato piora taxa de acerto apesar de R²/MAE melhores — rejeitado por proteção de sinal binário",
+    };
+  }
+
+  // Só considera substituição se candidato for pelo menos igual ou melhor em AMBAS as dimensões (R² E acerto)
+  if (candR2 > heurR2 && candAcerto >= heurAcerto) {
+    return { substituir: true, motivo: "Melhora em ambas as dimensões (R² e acerto)" };
+  }
+
+  return { substituir: false, motivo: "Sem melhora clara em ambas as dimensões" };
+}

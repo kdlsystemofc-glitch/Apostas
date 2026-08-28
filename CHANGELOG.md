@@ -8,8 +8,8 @@ Todas as alterações notáveis no projeto **Sports Predictor** serão documenta
 - **Novo:** Parser Estendido (`parseStatsHubText`) com extração de cabeçalho de jogos (`_jogos_header`), mandos `H`/`A`, placares, datas e histórico jogo-a-jogo (`historico`).
 - **Novo:** Cálculo de estatísticas descritivas do histórico: `media_casa`, `media_fora`, `media_recente` (decaimento exponencial $0.95^k$) e `desvio_padrao` por estatística.
 - **Validação:** Testes unitários com sequências mistas de 20 jogos (ex: Fulham `H A H A H A A H A H H H A A A H A H A H`).
-- **Nota de Arquitetura em Decomposição Multiplicativa Taxa x Volume:**
-  Ao calcular previsões derivadas (como $\text{xCorners} = \text{taxa\_cantos\_por\_chute} \times \text{xTotalShots}$), previsões extremas de volume (como times com médias atípicas de 28+ chutes) devem ser limitadas/capadas (ex: clamp max 18 chutes) para evitar a amplificação desastrosa de erro quadrático out-of-sample provocada por outliers.
+- **Nota Metodológica de Proteção de Sinal Binário (`decidirSubstituicao`):**
+  Métricas de erro contínuo ($R^2$, MAE) podem melhorar enquanto a taxa de acerto direcional (Over/Under) piora (como demonstrado em Defesas do Goleiro e Cartões). Para qualquer substituição futura de modelo, a regra `decidirSubstituicao()` exige validação simultânea em ambas as dimensões (melhoria em $R^2$ SEM degradação da taxa de acerto binária). A seleção de hiperparâmetros (como $\lambda_{\text{ridge}}$) é feita exclusivamente no treino via validação cruzada 5-fold (zero vazamento de teste).
 
 ---
 
