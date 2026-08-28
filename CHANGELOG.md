@@ -2,7 +2,23 @@
 
 Todas as alterações notáveis no projeto **Sports Predictor** serão documentadas neste arquivo.
 
-## [2.4.0] - 2026-08-28 — VERSÃO V2.4 (ENRIQUECIMENTO DE PARSER, HISTÓRICO H/A E NOTA DE ARQUITETURA DE DECOMPOSIÇÃO)
+## [2.5.0] - 2026-08-28 — VERSÃO V2.5 (SUBSTITUIÇÃO DE calcGols() PELO POISSON GLM PODADO)
+
+### 🚀 Destaques da Versão V2.5
+- **Motor de Gols em Produção:** `calcGols()` substituído pelo **Poisson GLM Podado (3 variáveis, λ_ridge=5.0)**.
+  - Modelo: $\ln(\lambda) = \beta_0 + \beta_1 \cdot xG_{\text{atk}} + \beta_2 \cdot \text{gols\_cedidos\_adv} + \beta_3 \cdot \text{sot\_cedidos\_adv}$
+  - Betas finais (IRLS sobre 161 jogos de treino): β0=-0.1259, β1=0.1093, β2=0.1517, β3=0.0440 (todos sinais positivos e coerentes).
+  - Aprovado por `decidirSubstituicao()`: melhora simultânea em $R^2$ (-0.226→-0.097) **e** taxa de acerto (48.8%→53.7%).
+- **Revalidação 1X2 com novo calcGols():** Brier Score 0.6197 vs baseline aleatório 0.6667. Teste de permutação bootstrap: **p=0.0152 ✓ SIGNIFICATIVO** (antes da substituição: p=0.2394). O GLM de Gols melhorou significativamente o Brier Score do 1X2.
+- **Revalidação BTTS:** 56.1% de acerto (23/41), p=0.1347 — sem significância (era 59.4% / p=0.1444 com heurística). BTTS permanece **⚠ EM ESTUDO**.
+- **Gols Fora Individual:** 68.3% acerto, p=0.0005 — sinal binário forte, mas $R^2=-0.1205$ (abaixo de 0.10). **⚠ EM ESTUDO** aguardando N>300 para promoção.
+- **Gols Casa Individual:** 51.2% acerto, p=0.4126 — sem sinal significativo. **⚠ EM ESTUDO**.
+- **Cartões Total e Defesas do Goleiro:** Heurística original **MANTIDA INTACTA** pela regra `decidirSubstituicao()` (proteção de sinal binário).
+- **Testes:** 24/24 aprovados (novo teste de regressão com ancoragem no primeiro jogo do conjunto de teste out-of-sample).
+
+---
+
+
 
 ### 🚀 Destaques da Versão V2.4
 - **Novo:** Parser Estendido (`parseStatsHubText`) com extração de cabeçalho de jogos (`_jogos_header`), mandos `H`/`A`, placares, datas e histórico jogo-a-jogo (`historico`).

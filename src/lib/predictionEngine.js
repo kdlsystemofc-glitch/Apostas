@@ -385,36 +385,43 @@ export function calcCorners(atk, def_, isHome = false) {
   };
 }
 
-// ── Market 2: Goals ──
+// ── Market 2: Goals — Poisson GLM Podado (3 Variáveis) ──
+// Modelo: ln(λ) = β0 + β1·xG_atk + β2·gols_cedidos_adv + β3·sot_cedidos_adv
+// Betas ajustados via IRLS + Ridge L2 (λ_ridge=5.0, selecionado por CV 5-fold)
+// sobre 161 jogos de treino (split cronológico 80/20 sobre 202 jogos).
+// Validação out-of-sample (N=41): MAE=1.12 vs 1.23 heurístico, R²=-0.097 vs -0.226,
+// acerto=53.7% vs 48.8%. Aprovado por decidirSubstituicao() (melhora em ambas as dimensões).
+// Cartões e Defesas do Goleiro permanecem com heurística por proteção de sinal binário.
+const GLM_GOLS_BETA0 = -0.125906; // intercepto
+const GLM_GOLS_BETA1 =  0.109264; // xG atacante          (+)
+const GLM_GOLS_BETA2 =  0.151711; // gols cedidos adv     (+)
+const GLM_GOLS_BETA3 =  0.043991; // chutes no gol ced adv (+)
+
 export function calcGols(atk, def_, isHome = false) {
-  const base = ancora(g(atk, "goals"), g(def_, "goals", "c"));
+  // Variáveis do modelo podado
+  const xg_atk       = g(atk,  "xg");
+  const gols_ced_adv = g(def_, "goals", "c");
+  const sot_ced_adv  = g(def_, "shots_on_target", "c");
 
-  const ofensivos = {
-    xg:                 [0.25, indice(g(atk, "xg"),                 g(def_, "xg",                 "c"))],
-    shots_on_target:    [0.25, indice(g(atk, "shots_on_target"),    g(def_, "shots_on_target",    "c"))],
-    big_chance_scored:  [0.20, indice(g(atk, "big_chance_scored"),  g(def_, "big_chance_scored",  "c"))],
-    shots_in_box:       [0.15, indice(g(atk, "shots_in_box"),       g(def_, "shots_in_box",       "c"))],
-    touches_opp_box:    [0.15, indice(g(atk, "touches_opp_box"),    g(def_, "touches_opp_box",    "c"))],
-  };
+  // Equação do link log: η = β0 + β1·xG + β2·gols_ced + β3·sot_ced
+  const eta = GLM_GOLS_BETA0
+    + GLM_GOLS_BETA1 * xg_atk
+    + GLM_GOLS_BETA2 * gols_ced_adv
+    + GLM_GOLS_BETA3 * sot_ced_adv;
 
-  const defensivos = {
-    shots_ced:  [0.45, resistencia(g(def_, "shots_on_target", "c"), g(atk, "shots_on_target"))],
-    clearances: [0.25, resistencia(g(def_, "clearances", "c"), g(atk, "shots_in_box"))],
-    errors:     [0.20, indice(g(atk, "errors_goal"), Math.max(g(def_, "errors_goal", "c"), 0.01))],
-    gk_saves:   [0.10, resistencia(g(def_, "gk_saves", "t"), g(atk, "shots_on_target"))],
-  };
-
-  const io = pesosDinamicos(ofensivos);
-  const id_ = pesosDinamicos(defensivos);
-  const ic = 0.50 * io + 0.50 * id_;
-  const raw = base * ic;
-  // Removido multiplicador de mando de campo (sem dupla contagem)
-  let xg = raw;
+  // Link canônico Poisson: μ = exp(η), clamped para evitar overflow
+  const mu = Math.exp(Math.min(10, Math.max(-10, eta)));
 
   return {
-    value: Math.round(xg * 100) / 100,
-    value_raw: Math.round(raw * 100) / 100,
-    details: { base: Math.round(base * 1000) / 1000, io: Math.round(io * 10000) / 10000, id: Math.round(id_ * 10000) / 10000 },
+    value:     Math.round(mu * 100) / 100,
+    value_raw: Math.round(mu * 100) / 100,
+    details: {
+      modelo:       "Poisson GLM Podado (λ_ridge=5.0)",
+      eta:          Math.round(eta * 10000) / 10000,
+      xg_atk:       Math.round(xg_atk * 10000) / 10000,
+      gols_ced_adv: Math.round(gols_ced_adv * 10000) / 10000,
+      sot_ced_adv:  Math.round(sot_ced_adv * 10000) / 10000,
+    },
   };
 }
 

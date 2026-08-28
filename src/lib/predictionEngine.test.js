@@ -245,11 +245,34 @@ describe("Prediction Engine V2 — Motor Preditivo de Mercados", () => {
     interceptions: { t: 8.0, c: 10.0 },
   };
 
-  it("calcGols() projeta expectativas de gols positivas", () => {
+  it("calcGols() [Poisson GLM Podado] projeta expectativas de gols positivas", () => {
     const xgHome = calcGols(dummyStatsCasa, dummyStatsFora, true);
     const xgAway = calcGols(dummyStatsFora, dummyStatsCasa, false);
     expect(xgHome.value).toBeGreaterThan(0);
     expect(xgAway.value).toBeGreaterThan(0);
+    // O GLM deve retornar os campos do modelo, não da heurística antiga
+    expect(xgHome.details).toHaveProperty("modelo");
+    expect(xgHome.details.modelo).toContain("Poisson GLM");
+    expect(xgHome.details).toHaveProperty("eta");
+    expect(xgHome.details).toHaveProperty("xg_atk");
+  });
+
+  it("calcGols() [Poisson GLM] — teste de regressão com inputs do primeiro jogo de teste out-of-sample", () => {
+    // Ancoragem nos valores reais do primeiro jogo do conjunto de teste (split 80/20 cronológico sobre 202 jogos):
+    // Home xG=0.33, Away goals_c=0.30, Away sot_c=0.50  -> predH=0.9779
+    // Away xG=0.35, Home goals_c=0.25, Home sot_c=1.55  -> predA=1.0186
+    // Total previsto: ~1.9965 (gols_real: home=1, away=1)
+    const atkHome = { xg: { t: 0.33 } };
+    const defFora = { goals: { c: 0.30 }, shots_on_target: { c: 0.50 } };
+    const predHome = calcGols(atkHome, defFora, true);
+
+    const atkAway = { xg: { t: 0.35 } };
+    const defCasa = { goals: { c: 0.25 }, shots_on_target: { c: 1.55 } };
+    const predAway = calcGols(atkAway, defCasa, false);
+
+    expect(predHome.value).toBeCloseTo(0.98, 1);
+    expect(predAway.value).toBeCloseTo(1.02, 1);
+    expect(predHome.value + predAway.value).toBeCloseTo(2.00, 0);
   });
 
   it("calcCorners() calcula escanteios com multiplicador de mando", () => {
