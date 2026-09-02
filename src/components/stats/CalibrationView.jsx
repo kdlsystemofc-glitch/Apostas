@@ -113,9 +113,11 @@ function calcBloco(matches) {
         avaliados++;
       } else {
         const linhaPrincipal = Math.floor(d.p) + 0.5;
-        const acertoOver = d.r > linhaPrincipal;
-        const previsaoOver = d.p >= linhaPrincipal;
-        if (previsaoOver === acertoOver) acertos++;
+        // Se a previsao for Over (p >= linhaPrincipal), o palpite assume "Over" e pra dar green real tem q ser maior
+        // Se a previsao for Under (p < linhaPrincipal), o palpite assume "Under" e pra dar green real tem q ser <= linha
+        const isOver = d.p >= linhaPrincipal;
+        const acerto = isOver ? d.r > linhaPrincipal : d.r <= linhaPrincipal;
+        if (acerto) acertos++;
         avaliados++;
       }
     }
@@ -188,63 +190,6 @@ export default function CalibrationView() {
     loadMatches();
   }, []);
 
-  const handleRestoreAllFromRawText = async () => {
-    setRecalculating(true);
-    try {
-      const all = await base44.entities.Match.list("-created_date", 500);
-      let count = 0;
-      let restaurados = 0;
-      let semTexto = 0;
-
-      for (const m of all) {
-        count++;
-        setProgressMsg(`Restaurando jogo ${count} de ${all.length}: ${m.home_team} vs ${m.away_team}`);
-
-        const rawHome = m.home_stats?._raw_text || m.home_text;
-        const rawAway = m.away_stats?._raw_text || m.away_text;
-
-        const temTextoHome = typeof rawHome === "string" && rawHome.trim().length > 10;
-        const temTextoAway = typeof rawAway === "string" && rawAway.trim().length > 10;
-
-        if (temTextoHome && temTextoAway) {
-          const cleanHomeStats = parseStatsHubText(rawHome);
-          cleanHomeStats._raw_text = rawHome.trim();
-          cleanHomeStats.dados_nao_verificados = false;
-
-          const cleanAwayStats = parseStatsHubText(rawAway);
-          cleanAwayStats._raw_text = rawAway.trim();
-          cleanAwayStats.dados_nao_verificados = false;
-
-          const newResults = analisarJogo(cleanHomeStats, cleanAwayStats);
-
-          await base44.entities.Match.update(m.id, {
-            home_stats: cleanHomeStats,
-            away_stats: cleanAwayStats,
-            results: newResults,
-          });
-          restaurados++;
-        } else {
-          const updatedHomeStats = { ...(m.home_stats || {}), dados_nao_verificados: true };
-          await base44.entities.Match.update(m.id, {
-            home_stats: updatedHomeStats,
-          });
-          semTexto++;
-        }
-      }
-
-      toast({
-        title: "Restauração Concluída!",
-        description: `${restaurados} jogos verificados/restaurados do texto original. ${semTexto} jogos sem texto foram marcados como não verificáveis.`
-      });
-      await loadMatches();
-    } catch (err) {
-      toast({ title: "Erro na restauração", description: err.message, variant: "destructive" });
-    } finally {
-      setRecalculating(false);
-      setProgressMsg("");
-    }
-  };
-
   const handleRecalculateAll = async () => {
     setRecalculating(true);
     try {
@@ -281,7 +226,6 @@ export default function CalibrationView() {
           });
           recalculados++;
         } else {
-          // NÃO utiliza fixLegacyStats — pula o recálculo e marca como dados não verificados
           const updatedHomeStats = { ...(m.home_stats || {}), dados_nao_verificados: true };
           await base44.entities.Match.update(m.id, {
             home_stats: updatedHomeStats,
@@ -292,7 +236,7 @@ export default function CalibrationView() {
 
       toast({
         title: "Recálculo concluído!",
-        description: `${recalculados} jogos recalculados com sucesso. ${pulados} jogos sem texto original não puderam ser recalculados com segurança.`,
+        description: `${recalculados} jogos recalculados com sucesso. ${pulados} ignorados por falta de texto bruto.`,
       });
       await loadMatches();
     } catch (err) {
@@ -439,14 +383,6 @@ export default function CalibrationView() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            onClick={handleRestoreAllFromRawText}
-            disabled={recalculating}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs gap-1.5"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-emerald-100" />
-            Restaurar Dados a partir do Texto Original
-          </Button>
-          <Button
             onClick={handleReevaluateReliability}
             className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs gap-1.5"
           >
@@ -521,70 +457,126 @@ export default function CalibrationView() {
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md p-5 shadow-xl">
-        <h3 className="font-bold text-sm text-emerald-400">Como interpretar os indicadores</h3>
-        <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
-          <strong>Viés</strong> = previsão média − real médio. Positivo = modelo superestima, negativo = subestima.<br/>
-          <strong>MAE</strong> = erro absoluto médio (quanto o modelo erra em unidades reais por jogo).<br/>
-          <strong>Calibrado</strong> se viés &lt; 0.30 · <strong>EM ESTUDO</strong> se mercado sob validação contínua (MERCADOS_EM_ESTUDO).
-        </p>
-      </div>
-
       {completed.length === 0 ? (
         <div className="text-center py-20 bg-slate-900/60 rounded-xl border border-slate-800 text-white">
           <p className="text-slate-300 font-bold text-base">Nenhum jogo com resultado registrado e verificado ainda.</p>
-          <p className="text-xs text-slate-400 mt-1">Registre resultados reais ou restaure os dados a partir do texto original.</p>
+          <p className="text-xs text-slate-400 mt-1">Registre resultados reais para ver a calibração do modelo.</p>
         </div>
       ) : (
-        blocos.map((bloco, i) => {
-          const stats = calcBloco(bloco);
-          const inicio = i * BLOCK_SIZE + 1;
-          const fim = Math.min((i + 1) * BLOCK_SIZE, completed.length);
-          return (
-            <div key={i} className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md overflow-hidden shadow-xl">
-              <div className="px-5 py-3 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800">
-                <span className="font-bold text-sm text-slate-100">Bloco {i + 1} — Jogos {inicio}–{fim}</span>
-                <span className="text-xs font-semibold text-slate-400">{bloco.length} jogos avaliados</span>
-              </div>
-              <div className="p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {stats.map(s => (
-                    <div key={s.key} className="rounded-lg bg-slate-950/60 p-3.5 border border-slate-800/80">
-                      <p className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">{s.name}</p>
-                      {s.status === "insuficiente" ? (
-                        <p className="text-xs text-slate-500 mt-1">Dados insuficientes ({s.n} jogos)</p>
-                      ) : (
-                        <div className="mt-2 space-y-1 text-xs tabular-nums font-semibold">
-                          <div className="flex justify-between text-slate-300">
-                            <span>Previsto</span>
-                            <span className="font-bold text-white">{s.mediaPrev}</span>
-                          </div>
-                          <div className="flex justify-between text-slate-300">
-                            <span>Real</span>
-                            <span className="font-bold text-white">{s.mediaReal}</span>
-                          </div>
-                          <div className="flex justify-between text-slate-300">
-                            <span>Viés</span>
-                            <span className={s.cor}>{s.vies > 0 ? "+" : ""}{s.vies}</span>
-                          </div>
-                          <div className="flex justify-between text-slate-300">
-                            <span>MAE</span>
-                            <span className="font-bold text-white">{s.mae}</span>
-                          </div>
-                          <div className="flex justify-between border-t border-slate-800/60 pt-1 text-slate-300">
-                            <span>Taxa Acerto</span>
-                            <span className="font-extrabold text-emerald-400">{s.winRate}</span>
-                          </div>
-                          <p className={`text-[11px] font-extrabold mt-1.5 ${s.cor}`}>{s.avaliacao}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+        <>
+          {/* Tabela Agregada (Global) */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md p-5 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <h3 className="font-extrabold text-sm text-blue-400 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  Calibração Agregada (Todos os Jogos Verificados)
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Taxa de Acerto e Erro Médio combinando todo o histórico disponível ({completed.length} jogos)
+                </p>
               </div>
             </div>
-          );
-        })
+            
+            <div className="overflow-x-auto border border-slate-800 rounded-lg">
+              <table className="w-full text-xs text-left text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase font-extrabold text-[11px] border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">Mercado</th>
+                    <th className="p-3 text-center">Jogos (N)</th>
+                    <th className="p-3 text-right">Previsto Médio</th>
+                    <th className="p-3 text-right">Real Médio</th>
+                    <th className="p-3 text-right">Viés (Bias)</th>
+                    <th className="p-3 text-right">Erro (MAE)</th>
+                    <th className="p-3 text-center">Taxa Acerto</th>
+                    <th className="p-3 text-right">Status do Modelo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {calcBloco(completed).map(s => (
+                    <tr key={s.key} className="hover:bg-slate-900/60">
+                      <td className="p-3 font-sans font-extrabold text-white">{s.name}</td>
+                      <td className="p-3 text-center text-slate-400">{s.n}</td>
+                      <td className="p-3 text-right text-slate-200">{s.mediaPrev}</td>
+                      <td className="p-3 text-right text-slate-200">{s.mediaReal}</td>
+                      <td className={`p-3 text-right font-bold ${s.vies > 0.3 || s.vies < -0.3 ? "text-amber-400" : "text-emerald-400"}`}>
+                        {s.vies > 0 ? "+" : ""}{s.vies}
+                      </td>
+                      <td className="p-3 text-right font-bold text-white">{s.mae}</td>
+                      <td className="p-3 text-center font-extrabold text-emerald-400">{s.winRate}</td>
+                      <td className={`p-3 text-right font-sans font-bold text-[10px] ${s.cor}`}>
+                        {s.avaliacao}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md p-5 shadow-xl">
+            <h3 className="font-bold text-sm text-emerald-400">Como interpretar os indicadores</h3>
+            <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+              <strong>Viés</strong> = previsão média − real médio. Positivo = modelo superestima, negativo = subestima.<br/>
+              <strong>MAE</strong> = erro absoluto médio (quanto o modelo erra em unidades reais por jogo).<br/>
+              <strong>Calibrado</strong> se viés &lt; 0.30 · <strong>EM ESTUDO</strong> se mercado sob validação contínua (MERCADOS_EM_ESTUDO).
+            </p>
+          </div>
+
+          {/* Histórico em Blocos */}
+          <div className="space-y-4">
+            <h3 className="font-extrabold text-base text-white px-2 mt-8">Histórico Detalhado em Blocos de {BLOCK_SIZE}</h3>
+            {blocos.map((bloco, i) => {
+              const stats = calcBloco(bloco);
+              const inicio = i * BLOCK_SIZE + 1;
+              const fim = Math.min((i + 1) * BLOCK_SIZE, completed.length);
+              return (
+                <div key={i} className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md overflow-hidden shadow-xl">
+                  <div className="px-5 py-3 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800">
+                    <span className="font-bold text-sm text-slate-100">Bloco {i + 1} — Jogos {inicio}–{fim}</span>
+                    <span className="text-xs font-semibold text-slate-400">{bloco.length} jogos avaliados</span>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {stats.map(s => (
+                        <div key={s.key} className="rounded-lg bg-slate-950/60 p-3.5 border border-slate-800/80">
+                          <p className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">{s.name}</p>
+                          {s.status === "insuficiente" ? (
+                            <p className="text-xs text-slate-500 mt-1">Dados insuficientes ({s.n} jogos)</p>
+                          ) : (
+                            <div className="mt-2 space-y-1 text-xs tabular-nums font-semibold">
+                              <div className="flex justify-between text-slate-300">
+                                <span>Previsto</span>
+                                <span className="font-bold text-white">{s.mediaPrev}</span>
+                              </div>
+                              <div className="flex justify-between text-slate-300">
+                                <span>Real</span>
+                                <span className="font-bold text-white">{s.mediaReal}</span>
+                              </div>
+                              <div className="flex justify-between text-slate-300">
+                                <span>Viés</span>
+                                <span className={s.cor}>{s.vies > 0 ? "+" : ""}{s.vies}</span>
+                              </div>
+                              <div className="flex justify-between text-slate-300">
+                                <span>MAE</span>
+                                <span className="font-bold text-white">{s.mae}</span>
+                              </div>
+                              <div className="flex justify-between border-t border-slate-800/60 pt-1 text-slate-300">
+                                <span>Taxa Acerto</span>
+                                <span className="font-extrabold text-emerald-400">{s.winRate}</span>
+                              </div>
+                              <p className={`text-[11px] font-extrabold mt-1.5 ${s.cor}`}>{s.avaliacao}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

@@ -322,29 +322,32 @@ export function calcularQuarterKelly(prob, oddCasa) {
   };
 }
 
+// ── Funções de Sinal para Mercados Over/Under ──
+// REGRA: O sistema SEMPRE assume Over ou Under — nunca "NEUTRO".
+// Quando prob ≥ 0.50 → palpite é Over. Quando prob < 0.50 → palpite é Under.
+// isOver indica a direção do palpite (true = Over, false = Under).
+
 export function sinalPoisson(prob) {
-  if (prob >= 0.65) return { label: "FORTE OVER", color: "green" };
-  if (prob >= 0.55) return { label: "OVER", color: "yellow" };
-  if (prob <= 0.35) return { label: "FORTE UNDER", color: "red" };
-  if (prob <= 0.45) return { label: "UNDER", color: "gray" };
-  return { label: "NEUTRO", color: "gray" };
+  if (prob >= 0.65) return { label: "FORTE OVER", color: "green", isOver: true };
+  if (prob >= 0.50) return { label: "OVER", color: "yellow", isOver: true };
+  if (prob >= 0.35) return { label: "UNDER", color: "gray", isOver: false };
+  return { label: "FORTE UNDER", color: "red", isOver: false };
 }
 
 export function sinalPoissonGols(prob) {
-  if (prob >= 0.68) return { label: "FORTE OVER", color: "green" };
-  if (prob >= 0.55) return { label: "OVER", color: "yellow" };
-  if (prob <= 0.32) return { label: "FORTE UNDER", color: "red" };
-  if (prob <= 0.45) return { label: "UNDER", color: "gray" };
-  return { label: "NEUTRO", color: "gray" };
+  if (prob >= 0.68) return { label: "FORTE OVER", color: "green", isOver: true };
+  if (prob >= 0.50) return { label: "OVER", color: "yellow", isOver: true };
+  if (prob >= 0.32) return { label: "UNDER", color: "gray", isOver: false };
+  return { label: "FORTE UNDER", color: "red", isOver: false };
 }
 
 export function sinalBTTS(p) {
-  if (p >= 0.60) return { label: "FORTE OVER", color: "green" };
-  if (p >= 0.52) return { label: "OVER", color: "yellow" };
-  if (p <= 0.38) return { label: "FORTE UNDER", color: "red" };
-  if (p <= 0.48) return { label: "UNDER", color: "gray" };
-  return { label: "NEUTRO", color: "gray" };
+  if (p >= 0.60) return { label: "FORTE SIM",  color: "green",  isOver: true  };
+  if (p >= 0.50) return { label: "SIM",         color: "yellow", isOver: true  };
+  if (p >= 0.40) return { label: "NÃO",         color: "gray",   isOver: false };
+  return           { label: "FORTE NÃO",  color: "red",    isOver: false };
 }
+
 
 // ── Market 1: Corners ──
 export function calcCorners(atk, def_, isHome = false) {
@@ -836,6 +839,9 @@ export function analisarJogo(statsCasa, statsFora) {
   const melhorTotalShotsTotal = melhorLinhaComercial(xtotalshots_total, COMMERCIAL_LINES.total_shots_total);
 
   // GERAÇÃO DE PALPITES EXPLÍCITOS PARA CADA UM DOS MERCADOS
+  // A direção (Over/Under) é determinada pela probabilidade: prob >= 0.50 → Over, < 0.50 → Under
+  function pickDir(m) { return m.prob >= 0.50 ? "Over" : "Under"; }
+
   const picks_explicitos = {
     pick_1x2: {
       palpite: resultado.pick_1x2.resultado,
@@ -843,88 +849,101 @@ export function analisarJogo(statsCasa, statsFora) {
       odd_justa: resultado.pick_1x2.odd_minima,
     },
     gols_total: {
-      palpite: `Over ${melhorGolsTotal.linha} Gols`,
+      palpite: `${pickDir(melhorGolsTotal)} ${melhorGolsTotal.linha} Gols`,
       linha: melhorGolsTotal.linha,
       proj: xg_total,
       prob: melhorGolsTotal.prob,
+      isOver: melhorGolsTotal.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorGolsTotal.prob)).toFixed(2),
     },
     gols_casa: {
-      palpite: `Over ${melhorGolsCasa.linha} Gols Mandante`,
+      palpite: `${pickDir(melhorGolsCasa)} ${melhorGolsCasa.linha} Gols Mandante`,
       linha: melhorGolsCasa.linha,
       proj: val_gols_casa,
       prob: melhorGolsCasa.prob,
+      isOver: melhorGolsCasa.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorGolsCasa.prob)).toFixed(2),
     },
     gols_fora: {
-      palpite: `Over ${melhorGolsFora.linha} Gols Visitante`,
+      palpite: `${pickDir(melhorGolsFora)} ${melhorGolsFora.linha} Gols Visitante`,
       linha: melhorGolsFora.linha,
       proj: val_gols_fora,
       prob: melhorGolsFora.prob,
+      isOver: melhorGolsFora.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorGolsFora.prob)).toFixed(2),
     },
     corners_total: {
-      palpite: `Over ${melhorCornersTotal.linha} Escanteios`,
+      palpite: `${pickDir(melhorCornersTotal)} ${melhorCornersTotal.linha} Escanteios`,
       linha: melhorCornersTotal.linha,
       proj: xc_total,
       prob: melhorCornersTotal.prob,
+      isOver: melhorCornersTotal.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorCornersTotal.prob)).toFixed(2),
     },
     corners_casa: {
-      palpite: `Over ${melhorCornersCasa.linha} Escanteios Mandante`,
+      palpite: `${pickDir(melhorCornersCasa)} ${melhorCornersCasa.linha} Escanteios Mandante`,
       linha: melhorCornersCasa.linha,
       proj: val_corners_casa,
       prob: melhorCornersCasa.prob,
+      isOver: melhorCornersCasa.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorCornersCasa.prob)).toFixed(2),
     },
     corners_fora: {
-      palpite: `Over ${melhorCornersFora.linha} Escanteios Visitante`,
+      palpite: `${pickDir(melhorCornersFora)} ${melhorCornersFora.linha} Escanteios Visitante`,
       linha: melhorCornersFora.linha,
       proj: val_corners_fora,
       prob: melhorCornersFora.prob,
+      isOver: melhorCornersFora.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorCornersFora.prob)).toFixed(2),
     },
     shots_total: {
-      palpite: `Over ${melhorShotsTotal.linha} Chutes no Gol`,
+      palpite: `${pickDir(melhorShotsTotal)} ${melhorShotsTotal.linha} Chutes no Gol`,
       linha: melhorShotsTotal.linha,
       proj: xs_total,
       prob: melhorShotsTotal.prob,
+      isOver: melhorShotsTotal.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorShotsTotal.prob)).toFixed(2),
     },
     cards_total: {
-      palpite: `Over ${melhorCardsTotal.linha} Cartões`,
+      palpite: `${pickDir(melhorCardsTotal)} ${melhorCardsTotal.linha} Cartões`,
       linha: melhorCardsTotal.linha,
       proj: xcard_total,
       prob: melhorCardsTotal.prob,
+      isOver: melhorCardsTotal.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorCardsTotal.prob)).toFixed(2),
     },
     fouls_total: {
-      palpite: `Over ${melhorFoulsTotal.linha} Faltas`,
+      palpite: `${pickDir(melhorFoulsTotal)} ${melhorFoulsTotal.linha} Faltas`,
       linha: melhorFoulsTotal.linha,
       proj: xfouls_total,
       prob: melhorFoulsTotal.prob,
+      isOver: melhorFoulsTotal.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorFoulsTotal.prob)).toFixed(2),
     },
     saves_total: {
-      palpite: `Over ${melhorSavesTotal.linha} Defesas Goleiro`,
+      palpite: `${pickDir(melhorSavesTotal)} ${melhorSavesTotal.linha} Defesas Goleiro`,
       linha: melhorSavesTotal.linha,
       proj: xsaves_total,
       prob: melhorSavesTotal.prob,
+      isOver: melhorSavesTotal.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorSavesTotal.prob)).toFixed(2),
     },
     totalshots_total: {
-      palpite: `Over ${melhorTotalShotsTotal.linha} Chutes Totais`,
+      palpite: `${pickDir(melhorTotalShotsTotal)} ${melhorTotalShotsTotal.linha} Chutes Totais`,
       linha: melhorTotalShotsTotal.linha,
       proj: xtotalshots_total,
       prob: melhorTotalShotsTotal.prob,
+      isOver: melhorTotalShotsTotal.prob >= 0.50,
       odd_justa: (1 / Math.max(0.01, melhorTotalShotsTotal.prob)).toFixed(2),
     },
     btts: {
       palpite: resultado.p_btts >= 0.50 ? "Ambas Marcam: SIM" : "Ambas Marcam: NÃO",
       prob: resultado.p_btts,
+      isOver: resultado.p_btts >= 0.50,
       odd_justa: resultado.p_btts > 0 ? (1 / resultado.p_btts).toFixed(2) : "—",
     },
   };
+
 
   return {
     raw_totals: {

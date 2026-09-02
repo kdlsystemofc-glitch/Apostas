@@ -9,7 +9,7 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
   const { calculateStakeAmount } = useBankrollStore();
   const useSinal = sinalFn || sinalPoisson;
 
-  // Encontra a linha mais próxima do valor esperado para destacar como linha principal
+  // Linha mais próxima do valor esperado como linha principal
   const closestLine = (lines && lines.length > 0 && xTotal != null)
     ? lines.reduce((a, b) => Math.abs(a - xTotal) < Math.abs(b - xTotal) ? a : b)
     : lines?.[0];
@@ -18,15 +18,29 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
   const fairOdd = bestProb > 0 ? Math.max(1.01, Math.round((1 / bestProb) * 100) / 100) : "—";
   const bestSignal = useSinal(bestProb);
 
-  // Avaliação GREEN / RED com base no valor real
+  // Direção do palpite principal: isOverBet = true → sistema recomenda Over, false → Under
+  const isOverBet = bestSignal.isOver !== undefined ? bestSignal.isOver : bestProb >= 0.50;
+
+  // Avaliação GREEN / RED considerando a DIREÇÃO do palpite
   const realValNum = realValue !== undefined && realValue !== null && realValue !== "" ? Number(realValue) : null;
   const hasReal = realValNum !== null && !isNaN(realValNum);
-  const isGreen = hasReal && closestLine != null ? realValNum > closestLine : null;
+
+  // GREEN se o palpite acertou:
+  //   Over: real > linha  (over passou)
+  //   Under: real <= linha (over não passou, ou seja, under acertou)
+  const isGreen = hasReal && closestLine != null
+    ? (isOverBet ? realValNum > closestLine : realValNum <= closestLine)
+    : null;
 
   const kelly = calcularQuarterKelly(bestProb, bookieOdd);
   const oddNum = parseFloat(bookieOdd);
   const hasBookieOdd = !isNaN(oddNum) && oddNum > 1.0;
   const stakeReais = hasBookieOdd && kelly.isEVPlus ? calculateStakeAmount(kelly.stakePct) : 0;
+
+  // Label do palpite principal: "Over X.5" ou "Under X.5"
+  const palpiteLabel = closestLine != null
+    ? `${isOverBet ? "Over" : "Under"} ${closestLine} ${title}`
+    : "—";
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md overflow-hidden shadow-xl">
@@ -48,15 +62,19 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
             </span>
           )}
           {closestLine != null && (
-            <span className="text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 px-2.5 py-1 rounded-full">
-              Linha Base: Over {closestLine}
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+              isOverBet
+                ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                : "bg-purple-500/10 text-purple-400 border-purple-500/30"
+            }`}>
+              Linha Base: {isOverBet ? "Over" : "Under"} {closestLine}
             </span>
           )}
         </div>
       </div>
 
       <div className="divide-y divide-slate-800/60">
-        {/* Box da Médias e Recomendação Principal */}
+        {/* Box das Médias e Recomendação Principal */}
         <div className="grid grid-cols-3 text-center text-sm">
           <div className="px-3 py-3 bg-slate-950/40">
             <p className="text-xs text-slate-400 mb-0.5 truncate font-semibold">{homeName}</p>
@@ -95,13 +113,15 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
                 )}
               </div>
               <p className="text-base font-extrabold text-white">
-                Over {closestLine} {title}
+                {palpiteLabel}
               </p>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right tabular-nums">
-                <span className="text-sm font-bold text-emerald-400 block">
-                  {(bestProb * 100).toFixed(1)}%
+                <span className={`text-sm font-bold block ${isOverBet ? "text-emerald-400" : "text-purple-400"}`}>
+                  {isOverBet
+                    ? `${(bestProb * 100).toFixed(1)}% Over`
+                    : `${((1 - bestProb) * 100).toFixed(1)}% Under`}
                 </span>
                 <span className="text-[11px] text-slate-300 font-medium">
                   Odd Justa: <strong className="text-white">{fairOdd}</strong>
@@ -142,7 +162,7 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
           )}
         </div>
 
-        {/* Tabela de Linhas Comerciais */}
+        {/* Tabela de Linhas Comerciais — avalia Over/Under corretamente por linha */}
         <div className="px-4 py-3">
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
             Linhas Comerciais Disponíveis (Odds Justas)
@@ -152,8 +172,15 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
               const prob = poissonOver(xTotal, line);
               const lineFairOdd = prob > 0 ? Math.max(1.01, Math.round((1 / prob) * 100) / 100) : "—";
               const sinal = useSinal(prob);
+              const lineIsOver = sinal.isOver !== undefined ? sinal.isOver : prob >= 0.50;
               const isClosest = line === closestLine;
-              const lineIsGreen = hasReal ? realValNum > line : null;
+
+              // GREEN/RED por linha considera a direção do sinal daquela linha
+              const lineIsGreen = hasReal
+                ? (lineIsOver ? realValNum > line : realValNum <= line)
+                : null;
+
+              const lineLabel = `${lineIsOver ? "Over" : "Under"} ${line}`;
 
               return (
                 <div
@@ -165,13 +192,13 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
                   } hover:bg-slate-800/40`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-100">Over {line}</span>
+                    <span className="text-sm font-bold text-slate-100">{lineLabel}</span>
                     {isClosest && (
                       <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase">
                         Principal
                       </span>
                     )}
-                    {hasReal && (
+                    {hasReal && lineIsGreen !== null && (
                       <span className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded border ${
                         lineIsGreen ? "bg-emerald-950 text-emerald-400 border-emerald-600" : "bg-rose-950 text-rose-400 border-rose-600"
                       }`}>
@@ -182,7 +209,9 @@ export default function MarketBlock({ icon, title, homeName, awayName, xHome, xA
                   <div className="flex items-center gap-4 tabular-nums">
                     <div className="text-right">
                       <span className="text-xs font-bold text-white">
-                        {(prob * 100).toFixed(1)}%
+                        {lineIsOver
+                          ? `${(prob * 100).toFixed(1)}%`
+                          : `${((1 - prob) * 100).toFixed(1)}%`}
                       </span>
                       <span className="text-[11px] text-slate-400 ml-2">
                         Odd Justa: <strong className="text-emerald-400 font-bold">{lineFairOdd}</strong>

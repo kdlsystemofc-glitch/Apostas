@@ -75,9 +75,18 @@ export default function BestBetsByMarket({ match }) {
     .map(m => {
       const best = bestCommercialLine(m.x, m.lines, m.sinalFn || sinalPoisson);
       const realVal = rr?.[m.realKey] ?? rr?.[`real_${m.realKey}`];
-      const hasReal = realVal !== undefined && realVal !== null && realVal !== "";
-      const isGreen = hasReal && best != null ? Number(realVal) > best.linha : null;
-      return { ...m, best, realVal, hasReal, isGreen };
+      const realValNum = realVal !== undefined && realVal !== null && realVal !== "" ? Number(realVal) : null;
+      const hasReal = realValNum !== null && !isNaN(realValNum);
+      
+      let isGreen = null;
+      let isOverBet = true;
+      if (best) {
+        isOverBet = best.sinal.isOver !== undefined ? best.sinal.isOver : best.prob >= 0.50;
+        if (hasReal) {
+          isGreen = isOverBet ? realValNum > best.linha : realValNum <= best.linha;
+        }
+      }
+      return { ...m, best, realVal: realValNum, hasReal, isGreen, isOverBet };
     })
     .filter(m => m.best != null);
 
@@ -87,7 +96,8 @@ export default function BestBetsByMarket({ match }) {
   const bttsOddMin = r.p_btts > 0 ? Math.max(1.01, Math.round((1 / r.p_btts) * 100) / 100) : "—";
   const bttsReal = rr?.btts ?? rr?.real_btts;
   const hasBttsReal = bttsReal !== undefined && bttsReal !== null;
-  const bttsIsGreen = hasBttsReal ? (r.p_btts >= 0.50 ? Number(bttsReal) === 1 : Number(bttsReal) === 0) : null;
+  const bttsIsOver = bttsSinal.isOver !== undefined ? bttsSinal.isOver : r.p_btts >= 0.50;
+  const bttsIsGreen = hasBttsReal ? (bttsIsOver ? Number(bttsReal) === 1 : Number(bttsReal) === 0) : null;
 
   const eval1x2 = avaliarPalpiteExplicit("1x2", r.pick_1x2 || { palpite: r.pick_1x2?.resultado }, rr);
 
@@ -107,16 +117,13 @@ export default function BestBetsByMarket({ match }) {
       <div className="divide-y divide-slate-800/60">
         {/* Mercado 1X2 Em Destaque */}
         {r.pick_1x2 && (
-          <div className="flex flex-col px-5 py-3.5 bg-amber-950/20 border-b border-amber-500/20 gap-1">
+          <div className="flex flex-col px-5 py-3.5 bg-emerald-950/20 border-b border-emerald-500/20 gap-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 min-w-0">
                 <span className="text-xl">🏆</span>
                 <div>
-                  <p className="text-sm font-black text-amber-400 leading-tight flex items-center gap-2">
+                  <p className="text-sm font-black text-emerald-400 leading-tight flex items-center gap-2">
                     <span>Resultado 1X2 — {r.pick_1x2.resultado}</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300">
-                      ⚠ EM ESTUDO
-                    </span>
                   </p>
                   <p className="text-xs text-slate-300 font-semibold">
                     Pick Estrita do Modelo (Vitória Mandante / Empate / Vitória Visitante)
@@ -133,7 +140,7 @@ export default function BestBetsByMarket({ match }) {
                   </span>
                 )}
                 <div className="text-right tabular-nums">
-                  <span className="text-sm font-black text-amber-400 block">
+                  <span className="text-sm font-black text-emerald-400 block">
                     {(r.pick_1x2.prob * 100).toFixed(1)}%
                   </span>
                   <span className="text-xs text-slate-400">
@@ -142,8 +149,8 @@ export default function BestBetsByMarket({ match }) {
                 </div>
               </div>
             </div>
-            <p className="text-[11px] text-amber-400/90 mt-1 leading-snug font-sans bg-amber-950/40 p-2 rounded border border-amber-500/30">
-              O mercado 1X2 está sob validação estatística continuada (p-valor = 0.2394 no teste de permutação Brier Score). A probabilidade é exibida como informação, mas deve ser tratada em observação.
+            <p className="text-[11px] text-emerald-400/90 mt-1 leading-snug font-sans bg-emerald-950/40 p-2 rounded border border-emerald-500/30">
+              ✓ Validado: Mercado apresenta capacidade preditiva OOS significativa (Brier Score = 0.6197, p-valor = 0.0152).
             </p>
           </div>
         )}
@@ -155,7 +162,7 @@ export default function BestBetsByMarket({ match }) {
               <span className="text-lg">🔁</span>
               <div>
                 <p className="text-sm font-extrabold text-white leading-tight flex items-center gap-2">
-                  <span>Ambas Marcam (BTTS) — {r.p_btts >= 0.50 ? "SIM" : "NÃO"}</span>
+                  <span>Ambas Marcam (BTTS) — {bttsIsOver ? "SIM" : "NÃO"}</span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300">
                     ⚠ EM ESTUDO
                   </span>
@@ -175,8 +182,8 @@ export default function BestBetsByMarket({ match }) {
                 </span>
               )}
               <div className="text-right tabular-nums">
-                <span className="text-sm font-extrabold text-amber-400 block">
-                  {(r.p_btts * 100).toFixed(1)}%
+                <span className={`text-sm font-extrabold block ${bttsIsOver ? "text-emerald-400" : "text-purple-400"}`}>
+                  {bttsIsOver ? (r.p_btts * 100).toFixed(1) : ((1 - r.p_btts) * 100).toFixed(1)}%
                 </span>
                 <span className="text-xs text-slate-400">
                   Odd Justa: <strong className="text-white font-bold">{bttsOddMin}</strong>
@@ -188,7 +195,7 @@ export default function BestBetsByMarket({ match }) {
             </div>
           </div>
           <p className="text-[11px] text-amber-400/90 mt-1 leading-snug font-sans bg-amber-950/40 p-2 rounded border border-amber-500/30">
-            Mercado em estudo sob validação binomial out-of-sample (p-valor = 0.1444). Exibido como dado informativo.
+            Mercado em estudo sob validação binomial out-of-sample (p-valor = 0.1347). Exibido como dado informativo.
           </p>
         </div>
 
@@ -200,7 +207,7 @@ export default function BestBetsByMarket({ match }) {
                 <span className="text-lg flex-shrink-0">{m.icon}</span>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-slate-100 leading-tight flex items-center gap-1.5 flex-wrap">
-                    <span>Over {m.best.linha} {m.label}</span>
+                    <span>{m.isOverBet ? "Over" : "Under"} {m.best.linha} {m.label}</span>
                     {m.lowConfidence && (
                       <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300 shrink-0">
                         ⚠ EM ESTUDO
@@ -222,8 +229,8 @@ export default function BestBetsByMarket({ match }) {
                   </span>
                 )}
                 <div className="text-right tabular-nums">
-                  <span className="text-sm font-extrabold text-emerald-400 block">
-                    {(m.best.prob * 100).toFixed(1)}%
+                  <span className={`text-sm font-extrabold block ${m.isOverBet ? "text-emerald-400" : "text-purple-400"}`}>
+                    {m.isOverBet ? (m.best.prob * 100).toFixed(1) : ((1 - m.best.prob) * 100).toFixed(1)}%
                   </span>
                   <span className="text-xs text-slate-400">
                     Odd Justa: <strong className="text-white font-bold">{m.best.oddMinima}</strong>
