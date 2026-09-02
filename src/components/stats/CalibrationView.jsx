@@ -10,7 +10,7 @@ import {
 } from "@/lib/calibrationLayer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Download, ShieldAlert, BarChart3, RotateCcw } from "lucide-react";
+import { Download, BarChart3 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 function erf(x) {
@@ -186,141 +186,7 @@ export default function CalibrationView() {
     }
   };
 
-  useEffect(() => {
-    loadMatches();
-  }, []);
 
-  const handleRecalculateAll = async () => {
-    setRecalculating(true);
-    try {
-      const all = await base44.entities.Match.list("-created_date", 500);
-      let count = 0;
-      let recalculados = 0;
-      let pulados = 0;
-
-      for (const m of all) {
-        count++;
-        setProgressMsg(`Recalculando jogo ${count} de ${all.length}: ${m.home_team} vs ${m.away_team}`);
-
-        const rawHome = m.home_stats?._raw_text || m.home_text;
-        const rawAway = m.away_stats?._raw_text || m.away_text;
-
-        const temTextoHome = typeof rawHome === "string" && rawHome.trim().length > 10;
-        const temTextoAway = typeof rawAway === "string" && rawAway.trim().length > 10;
-
-        if (temTextoHome && temTextoAway) {
-          const homeStats = parseStatsHubText(rawHome);
-          homeStats._raw_text = rawHome.trim();
-          homeStats.dados_nao_verificados = false;
-
-          const awayStats = parseStatsHubText(rawAway);
-          awayStats._raw_text = rawAway.trim();
-          awayStats.dados_nao_verificados = false;
-
-          const newResults = analisarJogo(homeStats, awayStats);
-
-          await base44.entities.Match.update(m.id, {
-            home_stats: homeStats,
-            away_stats: awayStats,
-            results: newResults,
-          });
-          recalculados++;
-        } else {
-          const updatedHomeStats = { ...(m.home_stats || {}), dados_nao_verificados: true };
-          await base44.entities.Match.update(m.id, {
-            home_stats: updatedHomeStats,
-          });
-          pulados++;
-        }
-      }
-
-      toast({
-        title: "Recálculo concluído!",
-        description: `${recalculados} jogos recalculados com sucesso. ${pulados} ignorados por falta de texto bruto.`,
-      });
-      await loadMatches();
-    } catch (err) {
-      toast({ title: "Erro ao recalcular", description: err.message, variant: "destructive" });
-    } finally {
-      setRecalculating(false);
-      setProgressMsg("");
-    }
-  };
-
-  const handleReevaluateReliability = () => {
-    const completed = matches.filter(m => (m.status === "completed" || m.real_results) && !m.home_stats?.dados_nao_verificados);
-    if (completed.length < 20) {
-      toast({ title: "Amostra Insuficiente", description: "Mínimo 20 partidas verificadas necessárias para split treino/teste.", variant: "destructive" });
-      return;
-    }
-
-    const sorted = [...completed].sort((a, b) => new Date(a.date || a.created_date) - new Date(b.date || b.created_date));
-    const trainSize = Math.floor(sorted.length * 0.80);
-    const trainSet = sorted.slice(0, trainSize);
-    const testSet = sorted.slice(trainSize);
-
-    function buildRealSum(homeKey, awayKey) {
-      return m => {
-        const rr = m.real_results;
-        if (!rr) return null;
-        const h = rr[homeKey] ?? rr[`real_${homeKey}`];
-        const a = rr[awayKey] ?? rr[`real_${awayKey}`];
-        if (h === undefined && a === undefined) return null;
-        return (Number(h) || 0) + (Number(a) || 0);
-      };
-    }
-
-    const problemMarkets = [
-      { key: "corners_total", name: "Escanteios Total", prev: m => m.results?.xc_total, real: buildRealSum("corners_home", "corners_away") },
-      { key: "shots_on_target", name: "Chutes no Gol Total", prev: m => m.results?.xs_total, real: buildRealSum("shots_home", "shots_away") },
-      { key: "fouls_total", name: "Faltas Total", prev: m => m.results?.xfouls_total, real: buildRealSum("fouls_home", "fouls_away") },
-      { key: "total_shots", name: "Chutes Totais", prev: m => m.results?.xtotalshots_total, real: buildRealSum("totalshots_home", "totalshots_away") },
-      { key: "btts", name: "Ambas Marcam (BTTS)", prev: m => m.results?.p_btts, real: m => m.real_results?.btts ?? m.real_results?.real_btts },
-    ];
-
-    const results = problemMarkets.map(mDef => {
-      const trainData = trainSet.map(m => ({ p: mDef.prev(m), r: mDef.real(m) })).filter(d => d.p != null && d.r != null);
-      const testData = testSet.map(m => ({ p: mDef.prev(m), r: mDef.real(m) })).filter(d => d.p != null && d.r != null);
-
-      let acertosTest = 0;
-      for (const d of testData) {
-        if (mDef.key === "btts") {
-          const predBTTS = d.p >= 0.5 ? 1 : 0;
-          if (predBTTS === d.r) acertosTest++;
-        } else {
-          const linha = Math.floor(d.p) + 0.5;
-          if ((d.p >= linha) === (d.r > linha)) acertosTest++;
-        }
-      }
-
-      const binTest = testeBinomial(acertosTest, testData.length);
-      const winRateTest = testData.length > 0 ? (acertosTest / testData.length) * 100 : 0;
-
-      const meanYTest = testData.reduce((s, d) => s + d.r, 0) / (testData.length || 1);
-      const ssRes = testData.reduce((s, d) => s + (d.r - d.p) ** 2, 0);
-      const ssTot = testData.reduce((s, d) => s + (d.r - meanYTest) ** 2, 0);
-      const r2Test = ssTot !== 0 ? 1 - ssRes / ssTot : 0;
-
-      const podePromover = r2Test > 0.10 && binTest.significativo;
-
-      return {
-        key: mDef.key,
-        name: mDef.name,
-        nTrain: trainData.length,
-        nTest: testData.length,
-        r2Test: r2Test.toFixed(3),
-        winRateTest: winRateTest.toFixed(1),
-        pHat: (binTest.p_hat * 100).toFixed(1),
-        pValor: binTest.p_valor.toFixed(4),
-        significativo: binTest.significativo,
-        podePromover,
-        recomendacao: podePromover ? "🚀 ELEGÍVEL PARA PROMOÇÃO A CONFIÁVEL" : "⚠ MANTER EM ESTUDO (SEM SINAL RELEVANTE)",
-      };
-    });
-
-    setEvalResults(results);
-    toast({ title: "Reavaliação Concluída!", description: `Testes binomiais e OLS out-of-sample calculados.` });
-  };
 
   const handleExportReport = () => {
     const completed = matches.filter(m => (m.status === "completed" || m.real_results) && !m.home_stats?.dados_nao_verificados);
@@ -383,21 +249,6 @@ export default function CalibrationView() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            onClick={handleReevaluateReliability}
-            className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs gap-1.5"
-          >
-            <BarChart3 className="w-3.5 h-3.5 text-amber-100" />
-            Reavaliar Confiabilidade dos Mercados
-          </Button>
-          <Button
-            onClick={handleRecalculateAll}
-            disabled={recalculating}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs gap-1.5"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? "animate-spin" : ""}`} />
-            {recalculating ? "Recalculando..." : "Recalcular Todos (Massa)"}
-          </Button>
-          <Button
             onClick={handleExportReport}
             disabled={completed.length === 0}
             variant="outline"
@@ -409,47 +260,7 @@ export default function CalibrationView() {
         </div>
       </div>
 
-      {/* Painel de Reavaliação de Confiabilidade (Teste Binomial + OLS Out-of-Sample) */}
-      {evalResults && (
-        <div className="rounded-xl border border-amber-500/50 bg-amber-950/30 p-5 shadow-xl space-y-4">
-          <div>
-            <h4 className="font-extrabold text-sm text-amber-300 flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-amber-400" />
-              Reavaliação de Confiabilidade dos Mercados (Teste Binomial + Out-of-Sample)
-            </h4>
-            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-              Avaliação out-of-sample (split cronológico 80% treino / 20% teste). Promoção para "Confiável" exige R² &gt; 0.10 e teste binomial com p-valor &lt; 0.05.
-            </p>
-          </div>
 
-          <div className="overflow-x-auto border border-slate-800 rounded-lg">
-            <table className="w-full text-xs text-left text-slate-300">
-              <thead className="bg-slate-950 text-slate-400 uppercase font-extrabold text-[11px] border-b border-slate-800">
-                <tr>
-                  <th className="p-2.5">Mercado</th>
-                  <th className="p-2.5">Treino / Teste (N)</th>
-                  <th className="p-2.5">R² no Teste</th>
-                  <th className="p-2.5">Acerto Teste (%)</th>
-                  <th className="p-2.5">Teste Binomial (p-valor)</th>
-                  <th className="p-2.5">Recomendação Estatística</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
-                {evalResults.map(res => (
-                  <tr key={res.key} className="hover:bg-slate-900/60">
-                    <td className="p-2.5 font-sans font-extrabold text-white">{res.name}</td>
-                    <td className="p-2.5 text-slate-400">{res.nTrain} / {res.nTest} jogos</td>
-                    <td className={`p-2.5 font-bold ${Number(res.r2Test) > 0.10 ? "text-emerald-400" : "text-rose-400"}`}>{res.r2Test}</td>
-                    <td className="p-2.5 font-bold text-white">{res.winRateTest}%</td>
-                    <td className={`p-2.5 font-bold ${res.significativo ? "text-emerald-400" : "text-amber-400"}`}>{res.pValor} {res.significativo ? "(✓ Sig.)" : "(ns)"}</td>
-                    <td className={`p-2.5 font-sans font-bold text-[11px] ${res.podePromover ? "text-emerald-400" : "text-amber-400"}`}>{res.recomendacao}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {recalculating && (
         <div className="p-4 bg-blue-950/80 border border-blue-500/50 rounded-xl text-xs font-bold text-blue-200 animate-pulse">
