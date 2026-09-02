@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { parseStatsHubText, analisarJogo } from "@/lib/predictionEngine";
+
 import {
-  CALIBRATION_COEFFICIENTS,
-  setCalibrationCoefficients,
-  fitOLS,
+
   isMercadoEmEstudo,
   classificarMercado,
 } from "@/lib/calibrationLayer";
@@ -150,28 +148,12 @@ function calcBloco(matches) {
   });
 }
 
-const LABELS = {
-  corners: "Escanteios Total",
-  gols: "Gols Total",
-  cartoes: "Cartões Total",
-  chutesgol: "Chutes no Gol Total",
-  faltas: "Faltas Total",
-  saves: "Defesas Goleiro Total",
-  totalshots: "Chutes Totais",
-  btts: "Ambas Marcam (BTTS)",
-  gols_casa: "Gols Casa",
-  gols_fora: "Gols Fora",
-  corners_casa: "Escanteios Casa",
-  corners_fora: "Escanteios Fora",
-  result_1x2: "Resultado 1X2",
-};
+
 
 export default function CalibrationView() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [recalculating, setRecalculating] = useState(false);
-  const [progressMsg, setProgressMsg] = useState("");
-  const [evalResults, setEvalResults] = useState(null);
+
   const { toast } = useToast();
 
   const loadMatches = async () => {
@@ -186,7 +168,9 @@ export default function CalibrationView() {
     }
   };
 
-
+  useEffect(() => {
+    loadMatches();
+  }, []);
 
   const handleExportReport = () => {
     const completed = matches.filter(m => (m.status === "completed" || m.real_results) && !m.home_stats?.dados_nao_verificados);
@@ -262,11 +246,6 @@ export default function CalibrationView() {
 
 
 
-      {recalculating && (
-        <div className="p-4 bg-blue-950/80 border border-blue-500/50 rounded-xl text-xs font-bold text-blue-200 animate-pulse">
-          ⏳ {progressMsg}
-        </div>
-      )}
 
       {completed.length === 0 ? (
         <div className="text-center py-20 bg-slate-900/60 rounded-xl border border-slate-800 text-white">
